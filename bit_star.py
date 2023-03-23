@@ -1,4 +1,5 @@
 import networkx as nx
+
 # from collections import PriorityQueue
 from queue import PriorityQueue
 import numpy as np
@@ -9,6 +10,7 @@ import matplotlib.pyplot as plt
 
 random.seed(0)
 np.random.seed(0)
+
 
 class Map:
     def __init__(self, start, goal, image_path):
@@ -57,7 +59,6 @@ class Tree(nx.DiGraph):
         self.map = Map(start, goal, image_path)
         self.map_array = self.map.map
 
-
         self.dim = 2  # Search space dimension
 
         self.qv.put((self.gt(start) + self.h_hat(start), start))
@@ -95,29 +96,32 @@ class Tree(nx.DiGraph):
     def c_hat(self, node1, node2):  # Heuristic cost from node1 to node2.
         # print("c_hat")
         return np.linalg.norm(np.array(node1) - np.array(node2))
-    
 
     def a_hat(self, node1, node2):  # function for lazy people
         return self.g_hat(node1) + self.c_hat(node1, node2) + self.h_hat(node2)
-    
+
     def c(self, node1, node2):
         # use bresenham to check if there is an obstacle between node1 and node2
         # if there is an obstacle, return np.inf
         # else return c_hat
-        cells = list(bresenham(node1[0], node1[1], node2[0], node2[1]))
+        cells = list(
+            bresenham(
+                round(node1[0]), round(node1[1]), round(node2[0]), round(node2[1])
+            )
+        )
 
         for cell in cells:
             if cell in self.map.occupied():
                 # this could be slow if there are a lot of obstacles since occupied() could be O(n)
                 return np.inf
-            
+
         return self.c_hat(node1, node2)
 
     def parent(self, node):
         # print("Parent", node)
         # print("parent", list(self.predecessors(node)))
         return list(self.predecessors(node))[0]
-    
+
     def connected(self):
         connected = [self.start]
         for n in self.nodes():
@@ -166,18 +170,24 @@ class Tree(nx.DiGraph):
             # print("INTERSECTION", intersect)
             x_near = self.near(intersect, vmin)
         # print("X near", vmin, x_near)
-        for x in x_near:    
+        for x in x_near:
             # print("X", x)
             if self.a_hat(vmin, x) < self.ci:
-                self.qe.put((self.gt(vmin) + self.c_hat(vmin, x) + self.h_hat(x), (vmin, x)))
+                self.qe.put(
+                    (self.gt(vmin) + self.c_hat(vmin, x) + self.h_hat(x), (vmin, x))
+                )
         if vmin in self.unexpanded:
             v_near = self.near(self.connected(), vmin)
             for v in v_near:
                 # print("V", v)
-                if (not self.has_edge(vmin, v))\
-                    and (self.a_hat(vmin, v) < self.ci)\
-                    and (self.g_hat(v) + self.c_hat(vmin, v) < self.gt(v)):
-                    self.qe.put((self.gt(vmin) + self.c_hat(vmin, v) + self.h_hat(v), (vmin, v)))
+                if (
+                    (not self.has_edge(vmin, v))
+                    and (self.a_hat(vmin, v) < self.ci)
+                    and (self.g_hat(v) + self.c_hat(vmin, v) < self.gt(v))
+                ):
+                    self.qe.put(
+                        (self.gt(vmin) + self.c_hat(vmin, v) + self.h_hat(v), (vmin, v))
+                    )
             self.unexpanded.remove(vmin)
 
     def sample_unit_ball(self, d):
@@ -222,7 +232,9 @@ class Tree(nx.DiGraph):
         # if phs[0]< 0 or phs[1] < 0:
         # print("XBALL", xball, xball[0]**2 + xball[1]**2)
         # print("PHS", phs, self.ci)
-        return np.matmul(np.matmul(cwe, r), xball) + center
+        output = np.matmul(np.matmul(cwe, r), xball) + center
+        output = list(np.around(np.array(output), 7))
+        return output
         # return np.matmul(cwe, np.matmul(r, xball)) + center
 
     def sample(self):
@@ -256,16 +268,21 @@ class Tree(nx.DiGraph):
             # demo = np.ones((10, 10))
             # for x in list(set(xphs) & set(self.map.free_nodes())):
             #     demo[x] = 0
-            # print(demo)
+            # print("\n\n", demo, "\n\n")
             # exit()
-                  
-            # exit()
-            xrand = (int(xrand[0]), int(xrand[1])) 
 
-            if xrand in list(set(xphs) & set(self.map.free_nodes())):
+            # exit()
+            # xrand = (np.round(xrand[0]), np.round(xrand[1]))
+
+            # print("XRAND: ", xrand)
+            # xrand = ["%.2f" % elem for elem in xrand]
+            # print("List: ", list(set(xphs) & set(self.map.free_nodes())))
+            if (np.round(xrand[0]), np.round(xrand[1])) in list(
+                set(xphs) & set(self.map.free_nodes())
+            ):
                 break
 
-        return xrand
+        return tuple(xrand)
 
     def prune(self):
         self.x_reuse = []
@@ -285,142 +302,168 @@ class Tree(nx.DiGraph):
                 if (self.f_hat(v) > self.ci) or (self.gt(v) + self.h_hat(v) > self.ci):
                     self.remove_node(v)
                     # self.vsol.remove(v)
-                    # print("Unexpanded", self.unexpanded, v)
-                    self.unexpanded.remove(v)
+                    print("Unexpanded", self.unexpanded, v)
+                    if v in self.unexpanded:
+                        self.unexpanded.remove(v)
                     if self.f_hat(v) < self.ci:
                         self.x_reuse.append(v)
         return self.x_reuse
-    
+
     def final_solution(self):
         path = []
         node = self.goal
         # nx.draw(self)
         # plt.show()
-        while node!=self.start:
+        while node != self.start:
             path.append(node)
             node = self.parent(node)
         return path[::-1]
 
-def bitstar():
 
-    start = (0,0)
-    goal = (9,9)
+def bitstar():
+    start = (0, 0)
+    goal = (9, 9)
     unchanged = 0
 
-    map = np.ones((10,10))
+    maps = np.ones((10, 10))
+    maps[4:5, 4:5] = 0
 
-    tree = Tree(start=start, goal=goal, image_path=map)
+    print(maps)
+
+    tree = Tree(start=start, goal=goal, image_path=maps)
 
     iteration = 0
-    while True:
-
-        # print the iteration number
-        print("Iteration: ", iteration)
-        iteration += 1
-        # print("CI", tree.ci)
-        
-        if tree.qe.empty() and tree.qv.empty():
-            # print("Sampling")
-            tree.x_reuse = tree.prune()
-
-            # TODO: sample m nodes
-            x_sampling = []
-            while len(x_sampling) <= tree.m:
-                sample = tree.sample()
-                # print("Sampling", x_sampling)
-                if sample not in x_sampling:
-                    x_sampling.append(sample)
-                    # print("Appended", x_sampling)
-            
-
-            # print("x_reuse", tree.x_reuse, x_sampling)
-            tree.x_new = [*set(tree.x_reuse + x_sampling)]
-
-            # print("x_new", tree.x_new)
-            # tree.
-            # print("x_sampling", x_sampling)
-            tree.add_nodes_from(x_sampling)
-            # print("Nodes", tree.nodes())
-            for n in tree.connected():
-                tree.qv.put((tree.gt(n) + tree.h_hat(n), n)) # is goal a part of V
-            # print("queuev" , tree.qv.queue)
-            # print("queuee" , tree.qe.queue)
-        # return the value in the queue with the lowest cost but dont remove it
-
-        # print(tree.qv.queue[0])
-        # print(tree.qe.queue[0])
-
+    try:
         while True:
-            if tree.qv.empty():
-                break
-            tree.expand_next_vertex()
-            # print("queuev" , tree.qv.queue)
-            # print("queuee" , tree.qe.queue)
-            if tree.qv.empty() or tree.qe.empty() or tree.qv.queue[0][0] <= tree.qe.queue[0][0]:
-                break
+            # print the iteration number
+            print("Iteration: ", iteration)
+            iteration += 1
+            # print("CI", tree.ci)
 
-        if(not(tree.qe.empty())):
+            if tree.qe.empty() and tree.qv.empty():
+                # print("Sampling")
+                tree.x_reuse = tree.prune()
 
-            (vmin, xmin) = tree.qe.get(False)[1]
-            # print("Vmin, Xmin", vmin, xmin)
+                # TODO: sample m nodes
+                x_sampling = []
+                while len(x_sampling) <= tree.m:
+                    sample = tree.sample()
+                    # print("Sampling", x_sampling)
+                    if sample not in x_sampling:
+                        x_sampling.append(sample)
+                        # print("Appended", x_sampling)
 
-            if tree.gt(vmin) + tree.c_hat(vmin, xmin) + tree.h_hat(xmin) < tree.ci:
-                # print("2nd if")
-                if tree.gt(vmin) + tree.c_hat(vmin, xmin) < tree.gt(xmin):
-                    
-                    # do we check if the edge is already in the occupied space?
-                    # c_hat = c?
-                    cedge = tree.c(vmin, xmin)
-                    # print("3rd if")
-                    if tree.gt(vmin) + cedge + tree.h_hat(xmin) < tree.ci:
+                # print("x_reuse", tree.x_reuse, x_sampling)
+                tree.x_new = [*set(tree.x_reuse + x_sampling)]
 
-                        # print("4th if")
-                        
-                        if tree.gt(vmin) + cedge < tree.gt(xmin):
+                # print("x_new", tree.x_new)
+                # tree.
+                # print("x_sampling", x_sampling)
+                tree.add_nodes_from(x_sampling)
+                # print("Nodes", tree.nodes())
+                for n in tree.connected():
+                    tree.qv.put((tree.gt(n) + tree.h_hat(n), n))  # is goal a part of V
+                # print("queuev" , tree.qv.queue)
+                # print("queuee" , tree.qe.queue)
+            # return the value in the queue with the lowest cost but dont remove it
 
-                            if xmin in tree.connected():
-                                tree.remove_edge(tree.parent(xmin), xmin)
+            # print(tree.qv.queue[0])
+            # print(tree.qe.queue[0])
 
-                            else:
-                                tree.qv.put((tree.gt(xmin) + tree.h_hat(xmin), xmin))
-                                tree.unexpanded.append(xmin)
+            while True:
+                if tree.qv.empty():
+                    break
+                tree.expand_next_vertex()
+                # print("queuev" , tree.qv.queue)
+                # print("queuee" , tree.qe.queue)
+                if (
+                    tree.qv.empty()
+                    or tree.qe.empty()
+                    or tree.qv.queue[0][0] <= tree.qe.queue[0][0]
+                ):
+                    break
+
+            if not (tree.qe.empty()):
+                (vmin, xmin) = tree.qe.get(False)[1]
+                # print("Vmin, Xmin", vmin, xmin)
+
+                if tree.gt(vmin) + tree.c_hat(vmin, xmin) + tree.h_hat(xmin) < tree.ci:
+                    # print("2nd if")
+                    if tree.gt(vmin) + tree.c_hat(vmin, xmin) < tree.gt(xmin):
+                        # do we check if the edge is already in the occupied space?
+                        # c_hat = c?
+                        cedge = tree.c(vmin, xmin)
+                        # print("3rd if")
+                        if tree.gt(vmin) + cedge + tree.h_hat(xmin) < tree.ci:
+                            # print("4th if")
+
+                            if tree.gt(vmin) + cedge < tree.gt(xmin):
+                                if xmin in tree.connected():
+                                    tree.remove_edge(tree.parent(xmin), xmin)
+
+                                else:
+                                    tree.qv.put(
+                                        (tree.gt(xmin) + tree.h_hat(xmin), xmin)
+                                    )
+                                    tree.unexpanded.append(xmin)
+                                    if xmin == tree.goal:
+                                        tree.vsol.append(xmin)
+
+                                tree.add_edge(vmin, xmin, weight=cedge)
+                                # print("edge added")
+                                tree.ci = tree.gt(tree.goal)
+                                print("CI", tree.ci)
                                 if xmin == tree.goal:
-                                    tree.vsol.append(xmin)
-                                    
+                                    print("GOAL FOUND")
+                                    print(tree.final_solution())
+                                    solution = tree.final_solution()
+                                    # plot all the points in the solution
+                                    extent = [0, maps.shape[1], maps.shape[0], 0]
+                                    plt.imshow(
+                                        maps,
+                                        cmap="gray",
+                                        interpolation="nearest",
+                                        extent=extent,
+                                    )
+                                    y, x = zip(*solution)
+                                    plt.plot(y, x, "-rx")
+                                    plt.grid()
+                                    plt.show()
 
-                            tree.add_edge(vmin, xmin, weight=cedge)
-                            # print("edge added")
-                            tree.ci = tree.gt(tree.goal)
-                            if xmin == tree.goal:
-                                print("GOAL FOUND")
-                                print(tree.final_solution())
-                                # print(tree.edges)
-                                # exit()
+                                    # print(tree.edges)
+                                    # exit()
+                else:
+                    tree.qe = PriorityQueue()
+                    tree.qv = PriorityQueue()
+                    unchanged += 1
+
             else:
                 tree.qe = PriorityQueue()
                 tree.qv = PriorityQueue()
                 unchanged += 1
 
-            
-        
-        else:
-            tree.qe = PriorityQueue()
-            tree.qv = PriorityQueue()
-            unchanged += 1
+        # if unchanged == 100:
+    except KeyboardInterrupt:
+        print("BREAK")
+        print(tree.ci)
+        solution = tree.final_solution()
+        # plot all the points in maps
+        # flip the y axis of maps
+        extent = [0, maps.shape[1], maps.shape[0], 0]
+        plt.imshow(
+            maps,
+            cmap="gray",
+            interpolation="nearest",
+            extent=extent,
+        )
+        y, x = zip(*solution)
+        plt.plot(y, x, "-rx")
+        plt.grid()
+        plt.show()
 
-        if unchanged == 100:
-            print("BREAK")
-            break
-        
-
-        
     return tree.final_solution()
-
 
 
 if __name__ == "__main__":
     path = bitstar()
     print("FINAL PATH", path)
-
-# TODO: Write the Actual BIT* Algorithm.
-
