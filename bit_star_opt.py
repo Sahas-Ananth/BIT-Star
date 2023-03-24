@@ -88,7 +88,7 @@ class Tree(nx.DiGraph):
     def gt(self, node):  # Cost to traverse the tree from the root to node v
         # TODO fix parents of nodes. Currently throwing an error after first solution is found
         # Most likely due to when we prune the tree, nodes are still erroneosly kept as connected
-        
+
         if node == self.start:
             return 0
         if node not in self.connected():
@@ -255,6 +255,8 @@ class Tree(nx.DiGraph):
         return tuple(xrand)
 
     def prune(self):
+        # TODO potentially iterate through the connected nodes of nodes that are removed
+        # and subsequently remove them from self.V to avoid potential errors.
         self.x_reuse = []
         for n in self.unconnected():
             if self.f_hat(n) >= self.ci:
