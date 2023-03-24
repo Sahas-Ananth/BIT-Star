@@ -7,6 +7,7 @@ from PIL import Image
 from bresenham import bresenham
 import random
 import matplotlib.pyplot as plt
+import cv2
 
 random.seed(0)
 np.random.seed(0)
@@ -19,24 +20,31 @@ class Map:
         self.obstacles = []
         self.dim = 2
 
-        # self.map = np.asarray(Image.open(image_path))
-        self.map = image_path
+        self.map = np.asarray(Image.open(image_path))
+
+        ind = np.where(self.map > 0)
+        self.free = list(zip(ind[0], ind[1]))
+
+        ind = np.where(self.map == 0)
+        self.occ = list(zip(ind[0], ind[1]))
+        # self.map = image_path
         # return self.map
 
     def free_nodes(self):
-        ind = np.where(self.map == 1)
+        # ind = np.where(self.map == 1)
         # print(list(zip(ind[0], ind[1])))
-        return list(zip(ind[0], ind[1]))
+        return self.free
 
     def occupied(self):
-        ind = np.where(self.map == 0)
-        return list(zip(ind[0], ind[1]))
+        # ind = np.where(self.map == 0)
+        return self.occ
 
     def sample(self):
-        # Blame Shankara if this doesn't work.
-        # copy_map = self.map.map.copy()
-        ind = np.argwhere(self.map >= 0)
-        return random.choices(ind)[0]
+        while True:
+            x = np.random.uniform(low=0, high=self.map.shape[0])
+            y = np.random.uniform(low=0, high=self.map.shape[1])
+            if self.map[int(x), int(y)]:
+                return (x, y)
 
 
 class Tree(nx.DiGraph):
@@ -48,13 +56,13 @@ class Tree(nx.DiGraph):
         self.add_node(goal)
         self.qv = PriorityQueue()
         self.qe = PriorityQueue()
-        self.rbit = 1.5  # Radius of ball of interest
+        self.rbit = 100  # Radius of ball of interest
         self.unexpanded = [self.start]
         self.x_new = self.unconnected()
         # print("X_NEW", self.x_new)
         # exit()
         self.x_reuse = []
-        self.m = 3
+        self.m = 20
 
         self.map = Map(start, goal, image_path)
         self.map_array = self.map.map
@@ -104,18 +112,29 @@ class Tree(nx.DiGraph):
         # use bresenham to check if there is an obstacle between node1 and node2
         # if there is an obstacle, return np.inf
         # else return c_hat
-        cells = list(
-            bresenham(
-                round(node1[0]), round(node1[1]), round(node2[0]), round(node2[1])
-            )
-        )
+        x1, y1 = node1
+        x2, y2 = node2
 
-        for cell in cells:
-            if cell in self.map.occupied():
-                # this could be slow if there are a lot of obstacles since occupied() could be O(n)
+        n_divs = int(10 * np.linalg.norm(np.array(node1) - np.array(node2)))
+
+        for lam in np.linspace(0, 1, n_divs):
+            x = int(x1 + lam * (x2 - x1))
+            y = int(y1 + lam * (y2 - y1))
+            if self.map.map[x, y] == 0:
                 return np.inf
-
         return self.c_hat(node1, node2)
+        # cells = list(
+        #     bresenham(
+        #         round(node1[0]), round(node1[1]), round(node2[0]), round(node2[1])
+        #     )
+        # )
+
+        # for cell in cells:
+        #     if cell in self.map.occupied():
+        #         # this could be slow if there are a lot of obstacles since occupied() could be O(n)
+        #         return np.inf
+
+        # return self.c_hat(node1, node2)
 
     def parent(self, node):
         # print("Parent", node)
@@ -253,10 +272,10 @@ class Tree(nx.DiGraph):
         #     if self.f_hat(np.array([x, y])) < self.ci
         # ]
         # exit()]
+        copy_map = self.map.map.copy()
+        flat = copy_map.flatten()
         while True:
-            copy_map = self.map.map.copy()
-
-            if len(xphs) < len(copy_map.flatten()):
+            if len(xphs) < len(flat):
                 # print("PHS")
                 xrand = self.samplePHS()
             else:
@@ -277,7 +296,7 @@ class Tree(nx.DiGraph):
             # print("XRAND: ", xrand)
             # xrand = ["%.2f" % elem for elem in xrand]
             # print("List: ", list(set(xphs) & set(self.map.free_nodes())))
-            if (np.round(xrand[0]), np.round(xrand[1])) in list(
+            if (int(xrand[0]), int(xrand[1])) in list(
                 set(xphs) & set(self.map.free_nodes())
             ):
                 break
@@ -321,15 +340,15 @@ class Tree(nx.DiGraph):
 
 
 def bitstar():
-    start = (0, 0)
-    goal = (9, 9)
+    start = (635, 140)
+    goal = (350, 400)
     unchanged = 0
 
-    maps = np.ones((10, 10))
-    maps[4:5, 4:5] = 0
-
-    print(maps)
-
+    maps = "gridmaps/occupancy_map.png"
+    mp = (cv2.imread(maps, 0) / 255).astype(np.uint8)
+    print(mp[256, 111])
+    plt.imshow(mp, cmap="gray")
+    plt.show()
     tree = Tree(start=start, goal=goal, image_path=maps)
 
     iteration = 0
@@ -374,13 +393,12 @@ def bitstar():
                 if tree.qv.empty():
                     break
                 tree.expand_next_vertex()
+
+                if tree.qe.empty():
+                    continue
                 # print("queuev" , tree.qv.queue)
                 # print("queuee" , tree.qe.queue)
-                if (
-                    tree.qv.empty()
-                    or tree.qe.empty()
-                    or tree.qv.queue[0][0] <= tree.qe.queue[0][0]
-                ):
+                if tree.qv.empty() or tree.qv.queue[0][0] <= tree.qe.queue[0][0]:
                     break
 
             if not (tree.qe.empty()):
@@ -418,9 +436,14 @@ def bitstar():
                                     print(tree.final_solution())
                                     solution = tree.final_solution()
                                     # plot all the points in the solution
-                                    extent = [0, maps.shape[1], maps.shape[0], 0]
+                                    extent = [
+                                        0,
+                                        tree.map_array.shape[1],
+                                        tree.map_array.shape[0],
+                                        0,
+                                    ]
                                     plt.imshow(
-                                        maps,
+                                        tree.map_array,
                                         cmap="gray",
                                         interpolation="nearest",
                                         extent=extent,
@@ -447,11 +470,11 @@ def bitstar():
         print("BREAK")
         print(tree.ci)
         solution = tree.final_solution()
-        # plot all the points in maps
-        # flip the y axis of maps
-        extent = [0, maps.shape[1], maps.shape[0], 0]
+        # plot all the points in tree.map_array
+        # flip the y axis of tree.map_array
+        extent = [0, tree.map_array.shape[1], tree.map_array.shape[0], 0]
         plt.imshow(
-            maps,
+            tree.map_array,
             cmap="gray",
             interpolation="nearest",
             extent=extent,
