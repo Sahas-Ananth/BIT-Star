@@ -336,6 +336,7 @@ class Tree(nx.DiGraph):
         while node != self.start:
             path.append(node)
             node = self.parent(node)
+        path.append(self.start)
         return path[::-1]
 
 

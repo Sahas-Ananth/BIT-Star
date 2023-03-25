@@ -28,7 +28,6 @@ class Map:
         ind = np.where(self.map == 0)
         self.occ = list(zip(ind[0], ind[1]))
 
-
     def free_nodes(self):
         return self.free
 
@@ -80,7 +79,6 @@ class Tree(nx.DiGraph):
                     self.xphs.append((x, y))
         self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
 
-
         if self.start == self.goal:
             self.vsol = [self.start]
             self.ci = 0
@@ -101,7 +99,7 @@ class Tree(nx.DiGraph):
             print(node, self[node])
             print(self.predecessors(node))
         while parent != self.start:
-            length += self[parent][node]['weight']
+            length += self[parent][node]["weight"]
             node = parent
             parent = self.parent(node)
 
@@ -135,7 +133,6 @@ class Tree(nx.DiGraph):
                 return np.inf
         return self.c_hat(node1, node2)
 
-
     def parent(self, node):
         return list(self.predecessors(node))[0]
 
@@ -156,7 +153,6 @@ class Tree(nx.DiGraph):
 
         return unconnected
 
-
     def near(self, search_list, node):
         # ? Possible bug here. "The function Near returns the states that meet the selected RGG connection criterion for a given vertex." We dont know what is "the RGG connection criterion".
 
@@ -167,13 +163,11 @@ class Tree(nx.DiGraph):
         return near
 
     def expand_next_vertex(self):
-
         vmin = self.qv.get(False)[1]
 
         if vmin in self.unexpanded:
             x_near = self.near(self.unconnected(), vmin)
         else:
-
             intersect = list(set(self.unconnected()) & set(self.x_new))
             # print("INTERSECTION", intersect)
             x_near = self.near(intersect, vmin)
@@ -225,7 +219,6 @@ class Tree(nx.DiGraph):
         r = np.diag([r1] + rn)
         xball = self.sample_unit_ball(self.dim)
         phs = np.matmul(np.matmul(cwe, r), xball) + center
-
 
         output = np.matmul(np.matmul(cwe, r), xball) + center
         output = list(np.around(np.array(output), 7))
@@ -283,6 +276,7 @@ class Tree(nx.DiGraph):
         while node != self.start:
             path.append(node)
             node = self.parent(node)
+        path.append(self.start)
         return path[::-1]
 
 
@@ -320,11 +314,10 @@ def bitstar():
                 for n in tree.connected():
                     tree.qv.put((tree.gt(n) + tree.h_hat(n), n))  # is goal a part of V
 
-
             while True:
                 if tree.qv.empty():
                     break
-                tree.expand_next_vertex() 
+                tree.expand_next_vertex()
 
                 if tree.qe.empty():
                     continue
@@ -336,10 +329,8 @@ def bitstar():
 
                 if tree.gt(vmin) + tree.c_hat(vmin, xmin) + tree.h_hat(xmin) < tree.ci:
                     if tree.gt(vmin) + tree.c_hat(vmin, xmin) < tree.gt(xmin):
-
                         cedge = tree.c(vmin, xmin)
                         if tree.gt(vmin) + cedge + tree.h_hat(xmin) < tree.ci:
-
                             if tree.gt(vmin) + cedge < tree.gt(xmin):
                                 if xmin in tree.connected():
                                     tree.remove_edge(tree.parent(xmin), xmin)
@@ -354,7 +345,6 @@ def bitstar():
                                     if xmin == tree.goal:
                                         tree.vsol.append(xmin)
 
-                                
                                 tree.ci = tree.gt(tree.goal)
                                 if xmin == tree.goal:
                                     print("GOAL FOUND")
@@ -378,6 +368,7 @@ def bitstar():
                                     plt.plot(y, x, "-rx")
                                     plt.grid()
                                     plt.show()
+                                    return solution
 
                 else:
                     tree.qe = PriorityQueue()
@@ -388,9 +379,9 @@ def bitstar():
                 tree.qe = PriorityQueue()
                 tree.qv = PriorityQueue()
                 unchanged += 1
-                
+
         # if unchanged == 100:
-        
+
     except KeyboardInterrupt:
         print("BREAK")
         print(tree.ci)
@@ -413,11 +404,11 @@ def bitstar():
 
 if __name__ == "__main__":
     import cProfile, pstats
+
     profiler = cProfile.Profile()
     profiler.enable()
     path = bitstar()
     print("FINAL PATH", path)
     profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats('cumtime')
+    stats = pstats.Stats(profiler).sort_stats("cumtime")
     stats.print_stats()
-
