@@ -94,14 +94,20 @@ class Tree(nx.DiGraph):
         length = 0
         try:
             parent = self.parent(node)
+            while parent != self.start:
+                length += self[parent][node]["weight"]
+                node = parent
+                parent = self.parent(node)
         except:
-            print(node in self.connected())
-            print(node, self[node])
-            print(self.predecessors(node))
-        while parent != self.start:
-            length += self[parent][node]["weight"]
-            node = parent
-            parent = self.parent(node)
+            print("Node:", node)
+            print("Connected", node in self.connected())
+            print("Keys", list(self[node].keys()))
+            print("Neighbor neighbor", self[list(self[node].keys())[0]])
+            print("Neighbors", self[node])
+            print("Predecessors", list(self.predecessors(node)))
+            exit()
+            # return np.inf
+        
 
         return length
 
@@ -260,15 +266,26 @@ class Tree(nx.DiGraph):
         for v in sorted_nodes:
             if v != self.goal and v != self.start:
                 if (self.f_hat(v) > self.ci) or (self.gt(v) + self.h_hat(v) > self.ci):
+                    # print("Pruned node", v, self.nodes[v])
+                    self.remove_children(v)
                     self.remove_node(v)
-                    self.V.remove(v)
+                    # self.V.remove(v)
                     # self.vsol.remove(v)
                     # print("Unexpanded", self.unexpanded, v)
                     if v in self.unexpanded:
                         self.unexpanded.remove(v)
                     if self.f_hat(v) < self.ci:
                         self.x_reuse.append(v)
+                
         return self.x_reuse
+    
+    def remove_children(self, n):
+        connected = list(self.successors(n))
+        if connected != []:
+            for c in connected:
+                self.remove_children(c)
+        if n in self.V:
+            self.V.remove(n)
 
     def final_solution(self):
         path = []
@@ -287,7 +304,6 @@ def bitstar():
 
     maps = "gridmaps/occupancy_map.png"
     mp = (cv2.imread(maps, 0) / 255).astype(np.uint8)
-    print(mp[256, 111])
     # plt.imshow(mp, cmap="gray")
     # plt.show()
     tree = Tree(start=start, goal=goal, image_path=maps)
@@ -368,7 +384,7 @@ def bitstar():
                                     plt.plot(y, x, "-rx")
                                     plt.grid()
                                     plt.show()
-                                    return solution
+                                    # return solution
 
                 else:
                     tree.qe = PriorityQueue()
