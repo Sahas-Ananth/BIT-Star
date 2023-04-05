@@ -53,11 +53,12 @@ class Tree(nx.DiGraph):
         self.qe = PriorityQueue()
         self.rbit = 100  # Radius of ball of interest
         self.unexpanded = [self.start]
-        self.x_new = self.unconnected()
+        
 
         self.x_reuse = []
         self.m = 20
         self.V = [self.start]
+        self.x_new = self.unconnected()
 
         self.map = Map(start, goal, image_path)
         self.map_array = self.map.map
@@ -152,10 +153,10 @@ class Tree(nx.DiGraph):
         return self.V
 
     def unconnected(self):
-        unconnected = []
-        for n in self.nodes():
-            if self.out_degree(n) == 0 and self.in_degree(n) == 0 and n != self.start:
-                unconnected.append(n)
+        unconnected = list(set(self.nodes()) - set(self.connected()))
+        # for n in self.nodes():
+        #     if self.out_degree(n) == 0 and self.in_degree(n) == 0 and n != self.start:
+        #         unconnected.append(n)
 
         return unconnected
 
