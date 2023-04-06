@@ -242,15 +242,14 @@ class Tree(nx.DiGraph):
         rn = [np.sqrt(self.ci**2 - cmin**2) / 2] * (self.dim - 1)
         r = np.diag([r1] + rn)
 
-
         while True:
             xball = self.sample_unit_ball(self.dim)
             # phs = np.matmul(np.matmul(cwe, r), xball) + center
-
             output = np.matmul(np.matmul(cwe, r), xball) + center
             output = list(np.around(np.array(output), 7))
-
-            if (int(output[0]), int(output[1])) in self.intersection:
+            i0 = int(output[0])
+            i1 = int(output[1])
+            if (i0, i1) in self.intersection:
                 break
         return output
     
@@ -262,7 +261,7 @@ class Tree(nx.DiGraph):
         print("Pre intersect:", time.time() - start)
         start = time.time()
         self.old_ci = self.ci
-        self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
+        self.intersection = set(self.xphs) & set(self.map.free_nodes())
         print("Post intersect:", time.time() - start)
 
 
