@@ -9,6 +9,7 @@ import random
 import matplotlib.pyplot as plt
 import cv2
 import cProfile
+import time
 
 random.seed(0)
 np.random.seed(0)
@@ -27,6 +28,7 @@ class Map:
 
         ind = np.where(self.map == 0)
         self.occ = list(zip(ind[0], ind[1]))
+        self.get_f_hat_map()
 
     def free_nodes(self):
         return self.free
@@ -40,6 +42,19 @@ class Map:
             y = np.random.uniform(low=0, high=self.map.shape[1])
             if self.map[int(x), int(y)]:
                 return (x, y)
+            
+    def get_f_hat_map(self):
+        
+        start = time.time()
+        
+        mapx, mapy = self.map.shape
+        self.f_hat_map = np.zeros((mapx, mapy))
+        
+        for x in range(mapx):
+            for y in range(mapy):
+                f_hat = np.linalg.norm(np.array([x, y]) - np.array(self.goal)) + \
+                        np.linalg.norm(np.array([x, y]) - np.array(self.start))
+                self.f_hat_map[x][y] = f_hat
 
 
 class Tree(nx.DiGraph):
@@ -72,13 +87,15 @@ class Tree(nx.DiGraph):
         self.ci = np.inf
         self.old_ci = self.ci
 
-        mapx, mapy = self.map_array.shape
-        self.xphs = []
-        for x in range(mapx):
-            for y in range(mapy):
-                if self.f_hat(np.array([x, y])) < self.ci:
-                    self.xphs.append((x, y))
-        self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
+        # mapx, mapy = self.map_array.shape
+        # self.xphs = []
+        # for x in range(mapx):
+        #     for y in range(mapy):
+        #         if self.f_hat(np.array([x, y])) < self.ci:
+        #             self.xphs.append((x, y))
+        # self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
+
+        self.get_PHS()
 
         if self.start == self.goal:
             self.vsol = [self.start]
@@ -106,7 +123,7 @@ class Tree(nx.DiGraph):
             print("Neighbor neighbor", self[list(self[node].keys())[0]])
             print("Neighbors", self[node])
             print("Predecessors", list(self.predecessors(node)))
-            exit()
+            # exit()
             # return np.inf
         
 
@@ -224,34 +241,43 @@ class Tree(nx.DiGraph):
         r1 = self.ci / 2
         rn = [np.sqrt(self.ci**2 - cmin**2) / 2] * (self.dim - 1)
         r = np.diag([r1] + rn)
-        xball = self.sample_unit_ball(self.dim)
-        phs = np.matmul(np.matmul(cwe, r), xball) + center
 
-        output = np.matmul(np.matmul(cwe, r), xball) + center
-        output = list(np.around(np.array(output), 7))
+
+        while True:
+            xball = self.sample_unit_ball(self.dim)
+            # phs = np.matmul(np.matmul(cwe, r), xball) + center
+
+            output = np.matmul(np.matmul(cwe, r), xball) + center
+            output = list(np.around(np.array(output), 7))
+
+            if (int(output[0]), int(output[1])) in self.intersection:
+                break
         return output
+    
+    def get_PHS(self):
+        mapx, mapy = self.map_array.shape
+        start = time.time()
+        self.xphs = [tuple(x) for x in np.argwhere(self.map.f_hat_map < self.ci)]
+        # print(self.xphs)
+        print("Pre intersect:", time.time() - start)
+        start = time.time()
+        self.old_ci = self.ci
+        self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
+        print("Post intersect:", time.time() - start)
+
 
     def sample(self):
         xrand = None
         if self.old_ci != self.ci:
-            mapx, mapy = self.map_array.shape
-            self.xphs = []
-            for x in range(mapx):
-                for y in range(mapy):
-                    if self.f_hat(np.array([x, y])) < self.ci:
-                        self.xphs.append((x, y))
-            self.old_ci = self.ci
-            self.intersection = list(set(self.xphs) & set(self.map.free_nodes()))
+            self.get_PHS()
 
-        while True:
-            if len(self.xphs) < len(self.copy_map_flat):
-                # print("PHS")
-                xrand = self.samplePHS()
-            else:
-                xrand = self.map.sample()
-            if (int(xrand[0]), int(xrand[1])) in self.intersection:
-                break
-
+        
+        if len(self.xphs) < len(self.copy_map_flat):
+            # print("PHS")
+            xrand = self.samplePHS()
+        else:
+            xrand = self.map.sample()
+            
         return tuple(xrand)
 
     def prune(self):
@@ -287,15 +313,19 @@ class Tree(nx.DiGraph):
                 self.remove_children(c)
         if n in self.V:
             self.V.remove(n)
+            # self.vsol.remove(n)
 
     def final_solution(self):
         path = []
+        path_length = 0
         node = self.goal
         while node != self.start:
+            path_length += self.c_hat(node, self.parent(node))
             path.append(node)
             node = self.parent(node)
         path.append(self.start)
-        return path[::-1]
+        return path[::-1], path_length
+    
 
 
 def bitstar():
@@ -307,6 +337,8 @@ def bitstar():
     mp = (cv2.imread(maps, 0) / 255).astype(np.uint8)
     # plt.imshow(mp, cmap="gray")
     # plt.show()
+
+    start_time = time.time()
     tree = Tree(start=start, goal=goal, image_path=maps)
 
     iteration = 0
@@ -364,27 +396,29 @@ def bitstar():
 
                                 tree.ci = tree.gt(tree.goal)
                                 if xmin == tree.goal:
-                                    print("GOAL FOUND")
-                                    print(tree.final_solution())
-                                    solution = tree.final_solution()
+                                    print("\n\nGOAL FOUND")
+                                    print("Time Taken:", time.time() - start_time)
+                                    start_time = time.time()
+                                    solution, length = tree.final_solution()
+                                    print("Path Length:", length)
                                     # plot all the points in the solution
-                                    extent = [
-                                        0,
-                                        tree.map_array.shape[1],
-                                        tree.map_array.shape[0],
-                                        0,
-                                    ]
-                                    # return solution
-                                    plt.imshow(
-                                        tree.map_array,
-                                        cmap="gray",
-                                        interpolation="nearest",
-                                        extent=extent,
-                                    )
-                                    x, y = zip(*solution)
-                                    plt.plot(y, x, "-rx")
-                                    plt.grid()
-                                    plt.show()
+                                    # extent = [
+                                    #     0,
+                                    #     tree.map_array.shape[1],
+                                    #     tree.map_array.shape[0],
+                                    #     0,
+                                    # ]
+                                    # # return solution
+                                    # plt.imshow(
+                                    #     tree.map_array,
+                                    #     cmap="gray",
+                                    #     interpolation="nearest",
+                                    #     extent=extent,
+                                    # )
+                                    # x, y = zip(*solution)
+                                    # plt.plot(y, x, "-rx")
+                                    # plt.grid()
+                                    # plt.show()
                                     # return solution
 
                 else:
@@ -402,21 +436,24 @@ def bitstar():
     except KeyboardInterrupt:
         print("BREAK")
         print(tree.ci)
-        solution = tree.final_solution()
+        # solution, length= tree.final_solution()
 
-        extent = [0, tree.map_array.shape[1], tree.map_array.shape[0], 0]
-        plt.imshow(
-            tree.map_array,
-            cmap="gray",
-            interpolation="nearest",
-            extent=extent,
-        )
-        x, y = zip(*solution)
-        plt.plot(y, x, "-rx")
-        plt.grid()
-        plt.show()
+        # extent = [0, tree.map_array.shape[1], tree.map_array.shape[0], 0]
+        # plt.imshow(
+        #     tree.map_array,
+        #     cmap="gray",
+        #     interpolation="nearest",
+        #     extent=extent,
+        # )
+        # x, y = zip(*solution)
+        # plt.plot(y, x, "-rx")
+        # plt.grid()
+        # plt.show()
 
-    return tree.final_solution()
+    # return tree.final_solution()
+    return None
+
+
 
 
 if __name__ == "__main__":
