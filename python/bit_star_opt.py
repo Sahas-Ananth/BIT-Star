@@ -31,10 +31,10 @@ class Map:
         self.get_f_hat_map()
 
     def free_nodes(self):
-        return self.free
+        return set(self.free)
 
     def occupied(self):
-        return self.occ
+        return set(self.occ)
 
     def sample(self):
         while True:
@@ -42,18 +42,16 @@ class Map:
             y = np.random.uniform(low=0, high=self.map.shape[1])
             if self.map[int(x), int(y)]:
                 return (x, y)
-            
+
     def get_f_hat_map(self):
-        
-        start = time.time()
-        
+        # start = time.time()
         mapx, mapy = self.map.shape
         self.f_hat_map = np.zeros((mapx, mapy))
-        
         for x in range(mapx):
             for y in range(mapy):
-                f_hat = np.linalg.norm(np.array([x, y]) - np.array(self.goal)) + \
-                        np.linalg.norm(np.array([x, y]) - np.array(self.start))
+                f_hat = np.linalg.norm(
+                    np.array([x, y]) - np.array(self.goal)
+                ) + np.linalg.norm(np.array([x, y]) - np.array(self.start))
                 self.f_hat_map[x][y] = f_hat
 
 
@@ -67,12 +65,13 @@ class Tree(nx.DiGraph):
         self.qv = PriorityQueue()
         self.qe = PriorityQueue()
         self.rbit = 100  # Radius of ball of interest
-        self.unexpanded = [self.start]
-        
+        self.unexpanded = set()
+        self.unexpanded.add(start)
 
-        self.x_reuse = []
+        self.x_reuse = set()
         self.m = 20
-        self.V = [self.start]
+        self.V = set()
+        self.V.add(self.start)
         self.x_new = self.unconnected()
 
         self.map = Map(start, goal, image_path)
@@ -83,7 +82,7 @@ class Tree(nx.DiGraph):
 
         self.qv.put((self.gt(start) + self.h_hat(start), start))
 
-        self.vsol = []
+        self.vsol = set()
         self.ci = np.inf
         self.old_ci = self.ci
 
@@ -98,13 +97,10 @@ class Tree(nx.DiGraph):
         self.get_PHS()
 
         if self.start == self.goal:
-            self.vsol = [self.start]
+            self.vsol.add(self.start)
             self.ci = 0
 
     def gt(self, node):  # Cost to traverse the tree from the root to node v
-        # TODO fix parents of nodes. Currently throwing an error after first solution is found
-        # Most likely due to when we prune the tree, nodes are still erroneosly kept as connected
-
         if node == self.start:
             return 0
         if node not in self.connected():
@@ -125,7 +121,6 @@ class Tree(nx.DiGraph):
             print("Predecessors", list(self.predecessors(node)))
             # exit()
             # return np.inf
-        
 
         return length
 
@@ -158,6 +153,8 @@ class Tree(nx.DiGraph):
         return self.c_hat(node1, node2)
 
     def parent(self, node):
+        if len(list(self.predecessors(node))) > 1:
+            print(list(self.predecessors(node)))
         return list(self.predecessors(node))[0]
 
     def connected(self):
@@ -170,7 +167,7 @@ class Tree(nx.DiGraph):
         return self.V
 
     def unconnected(self):
-        unconnected = list(set(self.nodes()) - set(self.connected()))
+        unconnected = set(set(self.nodes()) - self.connected())
         # for n in self.nodes():
         #     if self.out_degree(n) == 0 and self.in_degree(n) == 0 and n != self.start:
         #         unconnected.append(n)
@@ -180,10 +177,10 @@ class Tree(nx.DiGraph):
     def near(self, search_list, node):
         # ? Possible bug here. "The function Near returns the states that meet the selected RGG connection criterion for a given vertex." We dont know what is "the RGG connection criterion".
 
-        near = []
+        near = set()
         for search_node in search_list:
             if (self.c_hat(search_node, node) <= self.rbit) and (search_node != node):
-                near.append(search_node)
+                near.add(search_node)
         return near
 
     def expand_next_vertex(self):
@@ -192,7 +189,7 @@ class Tree(nx.DiGraph):
         if vmin in self.unexpanded:
             x_near = self.near(self.unconnected(), vmin)
         else:
-            intersect = list(set(self.unconnected()) & set(self.x_new))
+            intersect = self.unconnected() & self.x_new
             # print("INTERSECTION", intersect)
             x_near = self.near(intersect, vmin)
         # print("X near", vmin, x_near)
@@ -246,13 +243,13 @@ class Tree(nx.DiGraph):
             xball = self.sample_unit_ball(self.dim)
             # phs = np.matmul(np.matmul(cwe, r), xball) + center
             output = np.matmul(np.matmul(cwe, r), xball) + center
-            output = list(np.around(np.array(output), 7))
+            output = np.around(np.array(output), 7)
             i0 = int(output[0])
             i1 = int(output[1])
             if (i0, i1) in self.intersection:
                 break
         return output
-    
+
     def get_PHS(self):
         mapx, mapy = self.map_array.shape
         start = time.time()
@@ -264,27 +261,23 @@ class Tree(nx.DiGraph):
         self.intersection = set(self.xphs) & set(self.map.free_nodes())
         print("Post intersect:", time.time() - start)
 
-
     def sample(self):
         xrand = None
         if self.old_ci != self.ci:
             self.get_PHS()
 
-        
         if len(self.xphs) < len(self.copy_map_flat):
             # print("PHS")
             xrand = self.samplePHS()
         else:
             xrand = self.map.sample()
-            
+
         return tuple(xrand)
 
     def prune(self):
-        # TODO potentially iterate through the connected nodes of nodes that are removed
-        # and subsequently remove them from self.V to avoid potential errors.
-        self.x_reuse = []
+        self.x_reuse = set()
         for n in self.unconnected():
-            if self.f_hat(n) >= self.ci:
+            if self.f_hat(n) >= self.ci:  # TODO: We might not need this for loop
                 self.remove_node(n)
         # print("nodes", self.nodes())
         sorted_nodes = sorted(self.connected(), key=self.gt)
@@ -293,20 +286,19 @@ class Tree(nx.DiGraph):
             if v != self.goal and v != self.start:
                 if (self.f_hat(v) > self.ci) or (self.gt(v) + self.h_hat(v) > self.ci):
                     # print("Pruned node", v, self.nodes[v])
-                    self.remove_children(v)
-                    self.remove_node(v)
+                    self.remove_children(v)  # TODO: No need for DiGraph
+                    self.remove_node(v)  # TODO: No need for DiGraph
                     # self.V.remove(v)
                     # self.vsol.remove(v)
                     # print("Unexpanded", self.unexpanded, v)
                     if v in self.unexpanded:
                         self.unexpanded.remove(v)
                     if self.f_hat(v) < self.ci:
-                        self.x_reuse.append(v)
-                
+                        self.x_reuse.add(v)
         return self.x_reuse
-    
+
     def remove_children(self, n):
-        connected = list(self.successors(n))
+        connected = set(self.successors(n))
         if connected != []:
             for c in connected:
                 self.remove_children(c)
@@ -324,7 +316,6 @@ class Tree(nx.DiGraph):
             node = self.parent(node)
         path.append(self.start)
         return path[::-1], path_length
-    
 
 
 def bitstar():
@@ -332,7 +323,7 @@ def bitstar():
     goal = (350, 400)
     unchanged = 0
 
-    maps = "gridmaps/occupancy_map.png"
+    maps = "../gridmaps/occupancy_map.png"
     mp = (cv2.imread(maps, 0) / 255).astype(np.uint8)
     # plt.imshow(mp, cmap="gray")
     # plt.show()
@@ -349,14 +340,14 @@ def bitstar():
             if tree.qe.empty() and tree.qv.empty():
                 tree.x_reuse = tree.prune()
 
-                x_sampling = []
+                x_sampling = set()
                 while len(x_sampling) <= tree.m:
                     sample = tree.sample()
                     if sample not in x_sampling:
-                        x_sampling.append(sample)
+                        x_sampling.add(sample)
                         # print("Appeded", x_sampling)
 
-                tree.x_new = [*set(tree.x_reuse + x_sampling)]
+                tree.x_new = tree.x_reuse | x_sampling
 
                 tree.add_nodes_from(x_sampling)
                 for n in tree.connected():
@@ -384,14 +375,14 @@ def bitstar():
                                     tree.remove_edge(tree.parent(xmin), xmin)
                                     tree.add_edge(vmin, xmin, weight=cedge)
                                 else:
-                                    tree.V.append(xmin)
+                                    tree.V.add(xmin)
                                     tree.add_edge(vmin, xmin, weight=cedge)
                                     tree.qv.put(
                                         (tree.gt(xmin) + tree.h_hat(xmin), xmin)
                                     )
-                                    tree.unexpanded.append(xmin)
+                                    tree.unexpanded.add(xmin)
                                     if xmin == tree.goal:
-                                        tree.vsol.append(xmin)
+                                        tree.vsol.add(xmin)
 
                                 tree.ci = tree.gt(tree.goal)
                                 if xmin == tree.goal:
@@ -453,8 +444,6 @@ def bitstar():
     return None
 
 
-
-
 if __name__ == "__main__":
     import cProfile, pstats
 
@@ -465,3 +454,8 @@ if __name__ == "__main__":
     profiler.disable()
     stats = pstats.Stats(profiler).sort_stats("cumtime")
     stats.print_stats()
+
+
+# TODO: Rewrite the entire code to remove spaghetti code.
+# TODO: Remove the need for NetworkX
+# TODO: Use a Node class instead of a tuple
