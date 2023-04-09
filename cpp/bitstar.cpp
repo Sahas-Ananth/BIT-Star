@@ -6,7 +6,7 @@
 #include <random>
 #include <vector>
 #include <queue>
-#include <Bit_star.h>
+#include <bitstar.h>
 
 // #include <opencv2/opencv.hpp>
 int main()
@@ -42,7 +42,6 @@ double Bit_star::gt(Node node)
 
 }
 
-void Bit_star::generate_phs(){}
 
 double Bit_star::c_hat(Node node1, Node node2)
 {
@@ -382,6 +381,7 @@ int main(){
                 // Assume: assume that the current way is correct
                 tree.vertex_q.push(std::make_pair(n.g  + n.h_hat, n));
             }
+        }
 
             while(true){
 
@@ -485,20 +485,6 @@ int main(){
 
 
             }
-
-            
-
-
-
-            
-
-
-
-
-
-
-
-
         }
 
 
