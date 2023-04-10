@@ -7,25 +7,23 @@ from PIL import Image
 import random
 import matplotlib.pyplot as plt
 import cv2
-import cProfile
+import cProfile, pstats
 import time
+import os
 
 random.seed(0)
 np.random.seed(0)
 
-global start
-global goal
+global start_arr
+global goal_arr
 
 
 class Node:
-    def __init__(self, x, y, parent=None, gt=np.inf, par_cost=None):
-        self.x = x
-        self.y = y
-        self.tup = (x, y)
-        self.np_arr = np.array([x, y])
-        self.g_hat = self.gen_g_hat()
-        self.h_hat = self.gen_h_hat()
-        self.f_hat = self.g_hat + self.h_hat
+    def __init__(self, coords, parent=None, gt=np.inf, par_cost=None):
+        self.x = coords[0]
+        self.y = coords[1]
+        self.tup = (self.x, self.y)
+        self.np_arr = np.array([self.x, self.y])
         # TODO: Discuss with group about having cost from parent to node. This was weight parameter in the spaghetti code
         # assert par_cost is not None
         # assert gt is not None
@@ -34,10 +32,16 @@ class Node:
         self.par_cost = par_cost
         self.gt = gt
 
-        global start
-        self.start = start.np_arr
-        global goal
-        self.goal = goal.np_arr
+        global start_arr
+        self.start = start_arr
+        global goal_arr
+        self.goal = goal_arr
+
+        self.g_hat = self.gen_g_hat()
+        self.h_hat = self.gen_h_hat()
+        self.f_hat = self.g_hat + self.h_hat
+
+        self.children = set()
 
     def gen_g_hat(self):
         return np.linalg.norm(self.np_arr - self.start)
@@ -59,10 +63,11 @@ class Map:
         self.obstacles = set()
         self.dim = 2
         self.map = np.array(Image.open(image_path))
+        # self.map = np.ones((5, 5))
         ind = np.argwhere(self.map > 0)
-        self.free = set(zip(ind[0], ind[1]))
+        self.free = set(list(map(lambda x: tuple(x), ind)))
         ind = np.argwhere(self.map == 0)
-        self.occupied = set(zip(ind[0], ind[1]))
+        self.occupied = set(list(map(lambda x: tuple(x), ind)))
         self.get_f_hat_map()
 
     def sample(self):
@@ -82,12 +87,16 @@ class Map:
                 return new_node
 
     def get_f_hat_map(self):
+        global start_arr, goal_arr
         map_x, map_y = self.map.shape
         self.f_hat_map = np.zeros((map_x, map_y))
         for x in range(map_x):
             for y in range(map_y):
                 #! Potential BUG: Possible bug here with the Node class not having gt, parent, par_cost initialized.
-                self.f_hat_map[x, y] = Node(x, y).f_hat
+                f_hat = np.linalg.norm(
+                    np.array([x, y]) - np.array(goal_arr)
+                ) + np.linalg.norm(np.array([x, y]) - np.array(start_arr))
+                self.f_hat_map[x, y] = f_hat
 
 
 class bitstar:
@@ -109,9 +118,11 @@ class bitstar:
         self.unexpanded = set()
         self.vs = set()
         self.unconnected = set()
+        self.vsol = set()
 
         self.qv = PriorityQueue()
         self.qe = PriorityQueue()
+        self.qe_order = 0
 
         self.V.add(start)
         self.unconnected.add(goal)
@@ -127,12 +138,17 @@ class bitstar:
         elif node not in self.V:
             return np.inf
 
-        length = 0
-        while node != self.start:
-            length += node.par_cost
-            node = node.parent
+        # length = 0
+        # while node != self.start:
+        #     if node.parent is None or node.par_cost == np.inf:
+        #         print(node)
+        #         return np.inf
+        #     length += node.par_cost
+        #     node = node.parent
 
-        return length
+        # return length
+        # TODO: Figure out if this works
+        return node.par_cost + node.parent.gt
 
     def c_hat(self, node1, node2):
         return np.linalg.norm(node1.np_arr - node2.np_arr)
@@ -173,7 +189,9 @@ class bitstar:
 
         for x in x_near:
             if self.a_hat(vmin, x) < self.ci:
-                self.qe.put((vmin.gt + self.c(vmin, x), x.h_hat), (vmin, x))
+                cost = vmin.gt + self.c(vmin, x) + x.h_hat
+                self.qe.put((cost, self.qe_order, (vmin, x)))
+                self.qe_order += 1
                 #! Potential BUG: Should look like this: self.qe.put((vmin.gt + self.c(vmin, x), x.h_hat), (Node(vmin), Node(x))))
 
         if vmin in self.unexpanded:
@@ -184,7 +202,9 @@ class bitstar:
                     and (self.a_hat(vmin, v) < self.ci)
                     and (v.g_hat + self.c_hat(vmin, v) < v.gt)
                 ):
-                    self.qe.put((vmin.gt + self.c_hat(vmin, v) + v.h_hat), (vmin, v))
+                    cost = vmin.gt + self.c(vmin, v) + v.h_hat
+                    self.qe.put((cost, self.qe_order, (vmin, v)))
+                    self.qe_order += 1
             self.unexpanded.remove(vmin)
 
     def sample_unit_ball(self):
@@ -217,8 +237,9 @@ class bitstar:
         return op
 
     def get_PHS(self):
-        map_x, map_y = self.map.shape
-        self.xphs = set(zip(*np.argwhere(self.map.f_hat_map <= self.ci)))
+        map_x, map_y = self.map.map.shape
+        # self.xphs = set(np.argwhere(self.map.f_hat_map <= self.ci))
+        self.xphs = set([tuple(x) for x in np.argwhere(self.map.f_hat_map < self.ci)])
         # TODO: Why is self.old_ci being updated here?
         # self.old_ci = self.ci
         self.intersection = self.xphs & self.map.free
@@ -238,9 +259,13 @@ class bitstar:
 
     def prune(self):
         self.x_reuse = set()
+        new_unconnected = set()
         for n in self.unconnected:
-            if n.f_hat >= self.ci:
-                self.unconnected.remove(n)
+            # if n.f_hat >= self.ci:
+            #     self.unconnected.remove(n)
+            if n.f_hat < self.ci:
+                new_unconnected.add(n)
+        self.unconnected = new_unconnected
 
         sorted_nodes = sorted(self.V, key=lambda x: x.gt)
         for v in sorted_nodes:
@@ -250,8 +275,18 @@ class bitstar:
                     self.vsol.discard(v)
                     self.unexpanded.discard(v)
                     self.E.discard((v.parent, v))
+                    v.parent.children.remove(v)
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
+        self.unconnected.add(self.goal)
+
+    def remove_children(self, n):
+        connected = set(self.successors(n))
+        if connected != []:
+            for c in connected:
+                self.remove_children(c)
+        if n in self.V:
+            self.V.remove(n)
 
     def final_solution(self):
         path = []
@@ -263,9 +298,18 @@ class bitstar:
             node = node.parent
         path.append(self.start.tup)
         return path[::-1], path_length
+    
+    def update_children_gt(self, node):
+        if node.children != []:
+            for c in node.children:
+                c.gt = c.par_cost + node.gt
+                self.update_children_gt(c)
+                
 
     def make_plan(self):
         start = time.time()
+        unchanged = 0
+        it = 0
 
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
             return None, None
@@ -275,30 +319,118 @@ class bitstar:
             self.ci = 0
             return [self.start.tup], 0
 
-        while self.ci <= self.old_ci:
-            if self.qe.empty() and self.qv.empty():
-                self.prune()
-                x_sample = set()
-                while len(x_sample) < self.m:
-                    x_sample.add(self.sample())
+        try:
+            while self.ci <= self.old_ci:
+                # print("IT", it)
+                # print(self.E)
 
-                #! Potential BUG fix: iterate over x_new and set it as Node(tuple, gt, parent, par_cost)
-                self.x_new = self.x_reuse | x_sample
-                self.unconnected = self.x_new
-                for n in self.V:
-                    self.qv.put((n.gt + n.h_hat, n))
+                it += 1
+                if self.qe.empty() and self.qv.empty():
+                    self.prune()
+                    x_sample = set()
 
-            # TODO: Continue after this.
-            raise NotImplementedError
+                    while len(x_sample) < self.m:
+                        x_sample.add(self.sample())
+
+                    #! Potential BUG fix: iterate over x_new and set it as Node(tuple, gt, parent, par_cost)
+                    self.x_new = self.x_reuse | x_sample
+                    self.unconnected = self.unconnected | self.x_new
+                    for n in self.V:
+                        self.qv.put((n.gt + n.h_hat, n))
+                while True:
+                    if self.qv.empty():
+                        break
+                    self.expand_next_vertex()
+
+                    if self.qe.empty():
+                        continue
+                    if self.qv.empty() or self.qv.queue[0][0] <= self.qe.queue[0][0]:
+                        break
+
+                if not (self.qe.empty()):
+                    # print(self.qe.queue)
+                    (vmin, xmin) = self.qe.get(False)[2]
+
+                    if vmin.gt + self.c_hat(vmin, xmin) + xmin.h_hat < self.ci:
+                        if vmin.gt + self.c_hat(vmin, xmin) < xmin.gt:
+                            cedge = self.c(vmin, xmin)
+                            if vmin.gt + cedge + xmin.h_hat < self.ci:
+                                if vmin.gt + cedge < xmin.gt:
+                                    if xmin in self.V:
+                                        # tree.remove_edge(tree.parent(xmin), xmin)
+                                        # tree.add_edge(vmin, xmin, weight=cedge)
+                                        self.E.remove((xmin.parent, xmin))
+                                        xmin.parent.children.remove(xmin)
+
+                                        xmin.parent = vmin
+                                        xmin.par_cost = cedge
+                                        xmin.gt = self.gt(xmin)
+                                        self.E.add((xmin.parent, xmin))
+                                        xmin.parent.children.add(xmin)
+                                        self.update_children_gt(xmin)
+
+                                    else:
+                                        self.V.add(xmin)
+                                        # self.add_edge(vmin, xmin, weight=cedge)
+                                        xmin.parent = vmin
+                                        xmin.par_cost = cedge
+                                        xmin.gt = self.gt(xmin)
+                                        self.E.add((xmin.parent, xmin))
+                                        self.qv.put((xmin.gt + xmin.h_hat, xmin))
+                                        self.unexpanded.add(xmin)
+                                        if xmin == self.goal:
+                                            self.vsol.add(xmin)
+                                        xmin.parent.children.add(xmin)
+
+                                    self.ci = self.goal.gt
+                                    if xmin == self.goal:
+                                        print("\n\nGOAL FOUND")
+                                        print("Time Taken:", time.time() - start)
+                                        start = time.time()
+                                        solution, length = self.final_solution()
+                                        print("Path Length:", length)
+                                        print("Difference:", self.ci - length)
+                                        print(self.old_ci, self.ci)
+                                        self.old_ci = self.ci
+
+                    else:
+                        self.qe = PriorityQueue()
+                        self.qv = PriorityQueue()
+                        unchanged += 1
+
+                else:
+                    self.qe = PriorityQueue()
+                    self.qv = PriorityQueue()
+                    unchanged += 1
+        except KeyboardInterrupt:
+            print(time.time() - start)
+            print(self.final_solution())
+            return self.final_solution()
 
 
 if __name__ == "__main__":
     profiler = cProfile.Profile()
     profiler.enable()
-    start = Node(635, 140)
-    goal = Node(350, 400)
-    map_path = "../gridmaps/occupancy_map.png"
 
-    map_obj = Map(start=start, goal=goal, map_path=map_path)
+    start_arr = np.array([635, 140])
+    goal_arr = np.array([350, 400])
+
+    start = Node((635, 140), gt=0)
+    goal = Node((350, 400))
+
+    # start_arr = np.array([0, 0])
+    # goal_arr = np.array([4, 4])
+
+    # start = Node((0, 0), gt=0)
+    # goal = Node((4, 4))
+
+    map_path = f"{os.path.dirname(__file__)}/../gridmaps/occupancy_map.png"
+
+    map_obj = Map(start=start, goal=goal, image_path=map_path)
     planner = bitstar(start=start, goal=goal, occ_map=map_obj)
     path, path_length = planner.make_plan()
+    print(path, path_length)
+
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats("cumtime")
+    stats.print_stats()
