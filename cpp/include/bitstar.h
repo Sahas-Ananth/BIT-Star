@@ -189,7 +189,6 @@ private:
     
     double cur_cost = std::numeric_limits<double>::infinity();
     double old_cost = cur_cost;
-    Eigen::Matrix2Xi map;
     
     std::vector<Node> x_phs;
     int dim = 2;
@@ -206,6 +205,7 @@ public:
     {
     start = start_node;
     goal = goal_node;
+    this->map = map;
     
     // add node  = vert. and self.V = unconnected_vertex
     this->vert.push_back(start);
@@ -224,8 +224,10 @@ public:
     a1 = { (goal.x - start.x) / cmin, (goal.y - start.y) / cmin };
     one_1 = {{1, 0}};
 
-    int map_width = map.rows();
-    int map_height = map.cols();
+    map_width = map.rows();
+    map_height = map.cols();
+    std::cout << "map_width: " << map_width << std::endl;
+    std::cout << "map_height: " << map_height << std::endl;
     f_hat_map = Eigen::MatrixXd::Zero(map_width, map_height);
     free_nodes_map();
 
@@ -242,7 +244,7 @@ public:
     std::priority_queue<Edge> edge_q;
 
     std::vector<Node> x_reuse;
-    std::vector<std::tuple<int, int>> intersection;
+    std::set<Node> intersection;
     Eigen::MatrixXd f_hat_map;
     // std::vector<Eigen::Vector2d> xphs;
     int no_samples = 20;
@@ -264,6 +266,7 @@ public:
     std::vector<std::pair<double, double>> one_1;
     int map_width;
     int map_height;
+    Eigen::MatrixXd map;
     
     // functions
     double gt(Node node);
@@ -273,7 +276,6 @@ public:
     std::vector<double> sample_unit_ball(int d);
     void get_PHS();
     void get_f_hat_map();
-    bool intersection_check(Eigen::Vector2d node);
     Node sample();
     std::vector<Node> prune();
     std::vector<Eigen::Vector2d> final_solution();
@@ -286,4 +288,5 @@ public:
     Node sample_map();
     void f_hat_map_data();
     void free_nodes_map();
+    bool intersection_check(Eigen::Vector2d node);
 };
