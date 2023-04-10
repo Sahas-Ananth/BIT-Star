@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import cv2
 import cProfile
 import time
+import os
 
 random.seed(0)
 np.random.seed(0)
@@ -61,6 +62,7 @@ class Map:
         self.obstacles = set()
         self.dim = 2
         self.map = np.array(Image.open(image_path))
+        # self.map = np.ones((5, 5))
         ind = np.argwhere(self.map > 0)
         self.free = set(list(map(lambda x: tuple(x), ind)))
         ind = np.argwhere(self.map == 0)
@@ -244,7 +246,6 @@ class bitstar:
             self.get_PHS()
 
         if len(self.xphs) < len(self.flat_map):
-            print(len(self.xphs), len(self.flat_map))
             xrand = self.samplePHS()
         else:
             xrand = self.map.sample()
@@ -254,9 +255,13 @@ class bitstar:
 
     def prune(self):
         self.x_reuse = set()
+        new_unconnected = set()
         for n in self.unconnected:
-            if n.f_hat >= self.ci:
-                self.unconnected.remove(n)
+            # if n.f_hat >= self.ci:
+            #     self.unconnected.remove(n)
+            if n.f_hat < self.ci:
+                new_unconnected.add(n)
+        self.unconnected = new_unconnected
 
         sorted_nodes = sorted(self.V, key=lambda x: x.gt)
         for v in sorted_nodes:
@@ -268,6 +273,15 @@ class bitstar:
                     self.E.discard((v.parent, v))
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
+        self.unconnected.add(self.goal)
+
+    def remove_children(self, n):
+        connected = set(self.successors(n))
+        if connected != []:
+            for c in connected:
+                self.remove_children(c)
+        if n in self.V:
+            self.V.remove(n)
 
     def final_solution(self):
         path = []
@@ -293,86 +307,88 @@ class bitstar:
             self.ci = 0
             return [self.start.tup], 0
         
-        while self.ci <= self.old_ci:
-            print("IT", it)
-            print(self.qe.queue)
+        try:        
+            while self.ci <= self.old_ci:
+                print("IT", it)
+                # print(self.E)
 
-            it += 1
-            if self.qe.empty() and self.qv.empty():
-                self.prune()
-                x_sample = set()
+                it += 1
+                if self.qe.empty() and self.qv.empty():
+                    self.prune()
+                    x_sample = set()
 
-                while len(x_sample) < self.m:
-                    x_sample.add(self.sample())
+                    while len(x_sample) < self.m:
+                        x_sample.add(self.sample())
 
-                #! Potential BUG fix: iterate over x_new and set it as Node(tuple, gt, parent, par_cost)
-                self.x_new = self.x_reuse | x_sample
-                self.unconnected = self.x_new
-                for n in self.V:
-                    self.qv.put((n.gt + n.h_hat, n))
-            while True:
-                if self.qv.empty():
-                    break
-                self.expand_next_vertex()
+                    #! Potential BUG fix: iterate over x_new and set it as Node(tuple, gt, parent, par_cost)
+                    self.x_new = self.x_reuse | x_sample
+                    self.unconnected = self.unconnected | self.x_new
+                    for n in self.V:
+                        self.qv.put((n.gt + n.h_hat, n))
+                while True:
+                    if self.qv.empty():
+                        break
+                    self.expand_next_vertex()
 
-                if self.qe.empty():
-                    continue
-                if self.qv.empty() or self.qv.queue[0][0] <= self.qe.queue[0][0]:
-                    break
+                    if self.qe.empty():
+                        continue
+                    if self.qv.empty() or self.qv.queue[0][0] <= self.qe.queue[0][0]:
+                        break
 
-            if not (self.qe.empty()):
-                (vmin, xmin) = self.qe.get(False)[2]
+                if not (self.qe.empty()):
+                    # print(self.qe.queue)
+                    (vmin, xmin) = self.qe.get(False)[2]
 
-                if vmin.gt + self.c_hat(vmin, xmin) + xmin.h_hat < self.ci:
-                    if vmin.gt + self.c_hat(vmin, xmin) < xmin.gt:
-                        cedge = self.c(vmin, xmin)
-                        if vmin.gt + cedge + xmin.h_hat < self.ci:
-                            if vmin.gt + cedge < xmin.gt:
-                                if xmin in self.V:
-                                    # TODO: Figure out efficient way of adding and removing edges
-                                    # tree.remove_edge(tree.parent(xmin), xmin)
-                                    # tree.add_edge(vmin, xmin, weight=cedge)
-                                    self.E.remove((xmin.parent, xmin))
-                                    xmin.parent = vmin
-                                    xmin.par_cost = cedge
-                                    xmin.gt = self.gt(xmin)
-                                    self.E.add((xmin.parent, xmin))
+                    if vmin.gt + self.c_hat(vmin, xmin) + xmin.h_hat < self.ci:
+                        if vmin.gt + self.c_hat(vmin, xmin) < xmin.gt:
+                            cedge = self.c(vmin, xmin)
+                            if vmin.gt + cedge + xmin.h_hat < self.ci:
+                                if vmin.gt + cedge < xmin.gt:
+                                    if xmin in self.V:
+                                        # tree.remove_edge(tree.parent(xmin), xmin)
+                                        # tree.add_edge(vmin, xmin, weight=cedge)
+                                        self.E.remove((xmin.parent, xmin))
+                                        xmin.parent = vmin
+                                        xmin.par_cost = cedge
+                                        xmin.gt = self.gt(xmin)
+                                        self.E.add((xmin.parent, xmin))
+                                        
+                                    else:
+                                        self.V.add(xmin)
+                                        # self.add_edge(vmin, xmin, weight=cedge)
+                                        xmin.parent = vmin
+                                        xmin.par_cost = cedge
+                                        xmin.gt = self.gt(xmin)
+                                        self.E.add((xmin.parent, xmin))
+                                        self.qv.put(
+                                            (xmin.gt + xmin.h_hat, xmin)
+                                        )
+                                        self.unexpanded.add(xmin)
+                                        if xmin == self.goal:
+                                            self.vsol.add(xmin)
                                     
-                                else:
-                                    self.V.add(xmin)
-                                    # self.add_edge(vmin, xmin, weight=cedge)
-                                    xmin.parent = vmin
-                                    xmin.par_cost = cedge
-                                    xmin.gt = self.gt(xmin)
-                                    self.E.add((xmin.parent, xmin))
-                                    self.qv.put(
-                                        (xmin.gt + xmin.h_hat, xmin)
-                                    )
-                                    self.unexpanded.add(xmin)
-                                    if xmin == self.goal:
-                                        self.vsol.add(xmin)
 
-                                self.ci = self.goal.gt
-                                if xmin == self.goal:
-                                    print("\n\nGOAL FOUND")
-                                    print("Time Taken:", time.time() - start_time)
-                                    start_time = time.time()
-                                    solution, length = self.final_solution()
-                                    print("Path Length:", length)
+                                    self.ci = self.goal.gt
+                                    if xmin == self.goal:
+                                        print("\n\nGOAL FOUND")
+                                        print("Time Taken:", time.time() - start)
+                                        start = time.time()
+                                        solution, length = self.final_solution()
+                                        print("Path Length:", length)
+
+                    else:
+                        self.qe = PriorityQueue()
+                        self.qv = PriorityQueue()
+                        unchanged += 1
 
                 else:
                     self.qe = PriorityQueue()
                     self.qv = PriorityQueue()
                     unchanged += 1
-
-            else:
-                self.qe = PriorityQueue()
-                self.qv = PriorityQueue()
-                unchanged += 1
-
-        print(time.time() - start)
-        print(self.final_solution())
-        return self.final_solution()
+        except KeyboardInterrupt:
+            print(time.time() - start)
+            print(self.final_solution())
+            return self.final_solution()
 
 
 if __name__ == "__main__":
@@ -384,7 +400,16 @@ if __name__ == "__main__":
 
     start = Node((635, 140), gt=0)
     goal = Node((350, 400))
-    map_path = "../gridmaps/occupancy_map.png"
+
+
+    # start_arr = np.array([0, 0])
+    # goal_arr = np.array([4, 4])
+
+    # start = Node((0, 0), gt=0)
+    # goal = Node((4, 4))
+
+
+    map_path = f"{os.path.dirname(__file__)}/../gridmaps/occupancy_map.png"
 
     map_obj = Map(start=start, goal=goal, image_path=map_path)
     planner = bitstar(start=start, goal=goal, occ_map=map_obj)
