@@ -38,6 +38,19 @@ std::vector<double> Bit_star::sample_unit_ball(int d)
 }
 
 
+bool Bit_star::intersection_check(Eigen::Vector2d node){
+
+    Node node1(node(0), node(1));
+
+    if(std::find(intersection.begin(), intersection.end(), node1) != intersection.end()){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+
 Node Bit_star::samplePHS(){
 
     // SVD
@@ -152,7 +165,7 @@ void Bit_star::get_PHS(){
 
     old_ci = ci;
 
-    std::set<Node> intersection;
+    
     std::set<Node> set_xphs(xphs.begin(), xphs.end());
     std::set<Node> set_free_nodes(free_nodes.begin(), free_nodes.end());
     intersection.clear();
