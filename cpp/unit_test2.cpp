@@ -68,7 +68,7 @@ Node Bit_star::samplePHS(){
     Eigen::Matrix2d Sigma = S.asDiagonal();
     Eigen::Matrix2d lam = Eigen::Matrix2d::Identity(Sigma.rows(), Sigma.cols());
     lam(lam.rows() - 1, lam.cols() - 1) = U.determinant() * Vt.transpose().determinant();
-    Eigen::Matrix2d cwe = U * lam * Vt;
+    Eigen::Matrix2d cwe = U * (lam * Vt);
 
     std::vector<double> rn(dim - 1, std::sqrt(std::pow(ci, 2) - std::pow(cmin, 2)) / 2);
     Eigen::MatrixXd r(dim, dim);
@@ -110,10 +110,14 @@ Node Bit_star::sample_map(){
 
     while(true){
 
-        double x = static_cast<double>(rand()) / RAND_MAX * map_width;
-        double y = static_cast<double>(rand()) / RAND_MAX * map_height;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<double> dis(0.0, map_width);
+        std::uniform_real_distribution<double> dis1(0.0, map_height);
+        double x = dis(gen);
+        double y = dis1(gen);
 
-        if (map(static_cast<int>(x), static_cast<int>(y)) != 0){
+        if (map(int(x), int(y)) > 0){
 
             Node node = Node(x, y, &start, &goal);
             return node;
@@ -133,6 +137,9 @@ void Bit_star::free_nodes_map(){
         for(int j=0; j<map.cols(); j++){
             if(map(i,j) > 0){
                 free_nodes.push_back(Node(i,j,&start,&goal));
+            }
+            else{
+                occupied.push_back(Node(i,j));
             }
         }
     }
@@ -163,18 +170,14 @@ void Bit_star::get_PHS(){
         }
     }
 
-    old_ci = ci;
-
-    
+    // old_ci = ci;
+   
     std::set<Node> set_xphs(xphs.begin(), xphs.end());
     std::set<Node> set_free_nodes(free_nodes.begin(), free_nodes.end());
     intersection.clear();
     std::set_intersection(set_xphs.begin(), set_xphs.end(),
                         set_free_nodes.begin(), set_free_nodes.end(),
                         std::inserter(intersection, intersection.begin()));
-
-
-
 }
 
 
@@ -186,7 +189,7 @@ Node Bit_star::sample(){
         get_PHS();
     }
 
-    if(xphs.size() < map.rows()*map.cols()){
+    if(xphs.size() < map_size){
         
         xrand = samplePHS();
 
@@ -257,49 +260,117 @@ void Bit_star::remove_node(Node *node){
 
 }
 
-std::vector<Node> Bit_star::prune(){
+void Bit_star::prune(){
 
-    std::vector<Node> x_reuse;
+    // std::vector<Node> x_reuse;
+    std::vector<Node> new_unconnected;
     for(auto node : this->unconnected_vertex){
-        if(node.f_hat >= ci){
+        if(node.f_hat < ci){
             // x_reuse.push_back(node);
-            this->remove_node(&node);
+            new_unconnected.push_back(node);
         }
     }
+    this->unconnected_vertex = new_unconnected;
 
 
-    std::sort(connected_vertex.begin(), connected_vertex.end(), [](const Node& a, const Node& b) {
-        return a.gt < b.gt;
+    std::vector<Node> sorted_nodes = this->vert;
+
+    std::sort(sorted_nodes.begin(), sorted_nodes.end(), [](const Node& a, const Node& b) {
+        return a.g_hat < b.g_hat;
     });
 
 
-    for(auto node : this->connected_vertex){
+    for(auto node : sorted_nodes){
         if( !(node== this->start) && !(node== goal)){
 
-            if(node.f_hat >= ci || (node.gt + node.h_hat > ci)){
+            if(node.f_hat >= ci || (node.gt + node.h_hat >= ci)){
                 // x_reuse.push_back(node);
-                this->remove_node(&node);
+                // this->remove_node(&node);
+                // remove node from vert
+                if (std::find(this->vert.begin(), this->vert.end(), node) != this->vert.end())
+                {
+                    this->vert.erase(std::remove(this->vert.begin(), this->vert.end(), node), this->vert.end());
+                }
+
+                // remove node from vsol
+                if (std::find(this->vsol.begin(), this->vsol.end(), node) != this->vsol.end())
+                {
+                    this->vsol.erase(std::remove(this->vsol.begin(), this->vsol.end(), node), this->vsol.end());
+                }
+
+                // remove node from unexp_vertex
+                if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), node) != this->unexp_vertex.end())
+                {
+                    this->unexp_vertex.erase(std::remove(this->unexp_vertex.begin(), this->unexp_vertex.end(), node), this->unexp_vertex.end());
+                }
+
+                // remove node from edges
+                for (int i = 0; i < this->edges.size(); i++)
+                {
+                    if (this->edges[i].to_node == *node.parent || this->edges[i].from_node == node)
+                    {
+                        this->edges.erase(this->edges.begin() + i);
+                    }
+                }
+
+                // remove the children of the parent of the node
+                for(auto child : node.parent->children){
+                    if(*child == node){
+                        // remove node from node.parent->children
+                        node.parent->children.erase(std::remove(node.parent->children.begin(), node.parent->children.end(), node), node.parent->children.end());
+                    
+                    }
+                }
+
+                if(node.f_hat < ci){
+
+                    x_reuse.push_back(node);
+
+                }
+
 
             }
-            // if node is in unexp_vertex, remove from unexp_vertex
-            if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), node) != this->unexp_vertex.end())
-            {
-                this->unexp_vertex.erase(std::remove(this->unexp_vertex.begin(), this->unexp_vertex.end(), node), this->unexp_vertex.end());
-            }
-
-            if(node.f_hat < ci){
-
-                x_reuse.push_back(node);
-
-            }
+           
 
 
         }
            
     }
-    return x_reuse;
+    this->unconnected_vertex.push_back(this->goal);
+
+
+    // return x_reuse;
 
 }
+
+
+std::pair<std::vector<Node>, double> Bit_star::final_solution() {
+        std::vector<Node> path;
+        double path_length = 0;
+        Node node = this->goal;
+        while (!(node == this->start)) {
+            path_length += node.parent_cost;
+            path.push_back(node);
+            node = *node.parent;
+        }
+        path.push_back(this->start);
+        std::reverse(path.begin(), path.end());
+        return std::make_pair(path, path_length);
+}
+
+void Bit_star::update_children_gt(Node node){
+
+    if(node.children.size() > 0){
+        for(auto child : node.children){
+            child->gt = child->parent_cost + node.gt;
+            this->update_children_gt(*child);
+        }
+    }
+
+
+}
+
+
 
 void Bit_star::expand_next_vertex()
 {
@@ -310,19 +381,27 @@ void Bit_star::expand_next_vertex()
     // check if vmin is in unexp_vertex
     if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), vmin) != this->unexp_vertex.end())
     {
-        near_list = near(this->unexp_vertex, vmin);
+        near_list = near(this->unconnected_vertex, vmin);
     }
     else
     {   
         
         std::vector<Node> intersect;
-        for (const auto& node : x_new) {
-            for(const auto& node2 : this->unexp_vertex){
-                if(node.x == node2.x && node.y == node2.y){
-                    intersect.push_back(node);
-                }
-            }
-        }
+
+        std::set<Node> set_x_new(x_new.begin(), x_new.end());
+        std::set<Node> set_unconnected_vertex(unconnected_vertex.begin(), unconnected_vertex.end());
+        std::set_intersection(set_x_new.begin(), set_x_new.end(),
+                            set_unconnected_vertex.begin(), set_unconnected_vertex.end(),
+                            std::inserter(intersect, intersect.begin()));
+
+
+        // for (const auto& node : x_new) {
+        //     for(const auto& node2 : this->unconnected_vertex){
+        //         if(node.x == node2.x && node.y == node2.y){
+        //             intersect.push_back(node);
+        //         }
+        //     }
+        // }
 
         near_list = near(intersect, vmin);
 
@@ -330,9 +409,10 @@ void Bit_star::expand_next_vertex()
 
     for(auto near : near_list){
         
-        if(vmin.g_hat + c_hat(vmin, near) + near.h_hat  < ci) {
+        if(a_hat(vmin, near) < ci) {
 
-            Edge edge = Edge(vmin, near, c_hat(vmin, near));
+            double cost = vmin.gt + c(vmin, near) + near.h_hat;
+            Edge edge = Edge(vmin, near, cost);
             this->edge_q.push(edge);
         }
     }
@@ -340,31 +420,37 @@ void Bit_star::expand_next_vertex()
     // check if vmin is in unexp_vertex
     if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), vmin) != this->unexp_vertex.end())
     {
-        std::vector<Node> v_near = near(this->connected_vertex, vmin);
+        std::vector<Node> v_near = near(this->vert, vmin);
         for(auto near : v_near){
 
             // check if the edge exist in edges
             if (std::find(this->edges.begin(), this->edges.end(), Edge(vmin, near, c_hat(vmin, near))) == this->edges.end())
             {
-                if((vmin.g_hat + c_hat(vmin, near) + near.h_hat  < ci ) && (near.g_hat + c_hat(vmin, near) < near.gt)){
+                if((a_hat(vmin, near) < ci ) && (near.g_hat + c_hat(vmin, near) < near.gt)){
 
-                    Edge edge = Edge(vmin, near, c_hat(vmin, near));
+
+                    double cost = vmin.gt + c(vmin, near) + near.h_hat;
+                    Edge edge = Edge(vmin, near, cost);
                     this->edge_q.push(edge);
                 }
-
                 
             }
             
         }
+        // remove vmin from unexp_vertex
         auto new_end = std::remove(this->unexp_vertex.begin(), this->unexp_vertex.end(), vmin);
         this->unexp_vertex.erase(new_end, this->unexp_vertex.end());
-
     }
 }
 
 double Bit_star::c_hat(Node node1, Node node2)
 {
     return sqrt(pow(node1.x - node2.x, 2) + pow(node1.y - node2.y, 2));
+}
+
+double Bit_star::a_hat(Node node1, Node node2)
+{
+    return node1.g_hat + c_hat(node1, node2) + node2.h_hat;
 }
 
 double Bit_star::c(Node node1, Node node2)
@@ -382,15 +468,16 @@ double Bit_star::c(Node node1, Node node2)
         int x = int(x1 + lam * (x2 - x1));
         int y = int(y1 + lam * (y2 - y1));
 
-        if (x < 0 || x >= map.rows() || y < 0 || y >= map.cols() || map(x, y) != 0) {
-            return std::numeric_limits<double>::infinity();
+        for(auto node : this->occupied){
+            if(node.x == x && node.y == y){
+                return std::numeric_limits<double>::infinity();
+            }
         }
+    
 
     }
     return c_hat(node1, node2); 
-
 }
-
 double Bit_star::gt(Node node)
 {
 
@@ -399,21 +486,23 @@ double Bit_star::gt(Node node)
         return 0.0;
     }
     //check:  assumed all the nodes in vert are conected?
-    if (std::find(this->vert.begin(), this->vert.end(), node) == this->vert.end())
+    else if (std::find(this->vert.begin(), this->vert.end(), node) == this->vert.end())
     {
         return std::numeric_limits<double>::infinity();
     }
-    double length = 0.0;
-    Node *current = &node;
-    Node *parent = current->parent;
-    while(parent->x != start.x && parent->y != start.y)
-    {
-        // what is weight here - c_hat between current and parent?
-        length = length + c_hat(*current, *parent);
-        current = parent;
-        parent = current->parent;
-    }
-    return length;
+    // double length = 0.0;
+    // Node *current = &node;
+    // Node *parent = current->parent;
+    // while(parent->x != start.x && parent->y != start.y)
+    // {
+    //     // what is weight here - c_hat between current and parent?
+    //     length = length + c_hat(*current, *parent);
+    //     current = parent;
+    //     parent = current->parent;
+    // }
+    // return length;
+
+    return node.parent_cost + node.parent->gt;
 
 }
 
@@ -425,6 +514,8 @@ bool Bit_star::nodeEqual(const Node& n1, const Node& n2) {
 
 }
 
+
+// TODO: check main function properly
 int main()
 {
     
@@ -437,7 +528,29 @@ int main()
     int iteration = 0;
     std::cout << "start" << std::endl;
 
-    while(true){
+    // check if start is in free_nodes
+    if (std::find(tree->free_nodes.begin(), tree->free_nodes.end(), *start) == tree->free_nodes.end())
+    {
+        std::cout << "start is not in free_nodes" << std::endl;
+        return 0;
+    }
+    // check if goal is in free_nodes
+    if (std::find(tree->free_nodes.begin(), tree->free_nodes.end(), *goal) == tree->free_nodes.end())
+    {
+        std::cout << "goal is not in free_nodes" << std::endl;
+        return 0;
+    }
+
+    // if staart = goal
+    if (tree->nodeEqual(*start, *goal))
+    {
+        tree->vsol.push_back(*start);
+        tree->ci = 0.0;
+        std::cout << "start = goal" << std::endl;
+        return 0;
+    }
+
+    while(tree->ci <= tree->old_ci){
         
         std::cout << "iteration: " << iteration << std::endl;
         iteration++;
@@ -445,17 +558,17 @@ int main()
         if(tree->edge_q.empty() && tree->vertex_q.empty()){
             
             std::cout << "edge_q and vertex_q are empty" << std::endl;
-            tree->x_reuse = tree->prune();
-           
+            tree->prune();
+            std::cout << "x_reuse size: " << tree->x_reuse.size() << std::endl;
             std::vector<Node> x_sampling;
 
             while(x_sampling.size() < tree->no_samples){
                 Node node = tree->sample();
                 // check if node is in x_Sampling
-                if (std::find(x_sampling.begin(), x_sampling.end(), node) == x_sampling.end())
-                {
+                // if (std::find(x_sampling.begin(), x_sampling.end(), node) == x_sampling.end())
+                // {
                     x_sampling.push_back(node);
-                }
+                // }
 
             }
 
@@ -466,26 +579,36 @@ int main()
                 tree->x_new.push_back(node);
             }
             // remove duplicates
+            // sort x_new
+            // CHECK:  is this sorting correct?
+            std::sort(tree->x_new.begin(), tree->x_new.end(), [](const Node& a, const Node& b) {
+                return a.g_hat < b.g_hat;
+            });
             auto newEnd = std::unique(tree->x_new.begin(), tree->x_new.end(),
                     [tree](const Node& n1, const Node& n2) {
                         return tree->nodeEqual(n1, n2);
                     });
             tree->x_new.erase(newEnd, tree->x_new.end());
                         
-            for(auto node : x_sampling){
-                Node newNode = Node(node.x, node.y, start, goal, tree->gt(node), true);
-                tree->vert.push_back(newNode);
-                tree->unconnected_vertex.push_back(newNode);
+
+            
+            for(auto node : tree->x_new){
+                tree->unconnected_vertex.push_back(node);
             }
+            std::sort(tree->unconnected_vertex.begin(), tree->unconnected_vertex.end(), [](const Node& a, const Node& b) {
+                return a.g_hat < b.g_hat;
+            });
 
-            for(auto node: tree->connected_vertex){
+            // remove duplicates
+            auto newEnd = std::unique(tree->unconnected_vertex.begin(), tree->unconnected_vertex.end(),
+                    [tree](const Node& n1, const Node& n2) {
+                        return tree->nodeEqual(n1, n2);
+                    });
+            tree->unconnected_vertex.erase(newEnd, tree->unconnected_vertex.end());
 
+            for(auto node: tree->vert){
                 tree->vertex_q.push(node);
-
             }
-
-
-
        }
 
         while(true){
@@ -511,7 +634,7 @@ int main()
             Edge edge = tree->edge_q.top();
             tree->edge_q.pop();
 
-            if(edge.edge_weight < tree->ci){
+            if(edge.from_node.gt + tree->c_hat(edge.from_node, edge.to_node) + edge.to_node.h_hat < tree->ci){
                 if(edge.from_node.gt + tree->c_hat(edge.from_node, edge.to_node) < edge.to_node.gt){
                    
                     double cedge = tree->c(edge.from_node, edge.to_node);
@@ -519,8 +642,34 @@ int main()
 
                         if(edge.from_node.gt + cedge < edge.to_node.gt){
                         //    check if to_node exists in connected_vertex
-                            if (std::find(tree->connected_vertex.begin(), tree->connected_vertex.end(), edge.to_node) != tree->connected_vertex.end())
+                            if (std::find(tree->vert.begin(), tree->vert.end(), edge.to_node) != tree->vert.end())
                             {
+
+                                // remove to_node.parent and to_node from edges
+                                for(auto edges : tree->edges){
+                                   if(edges.from_node.x == edge.to_node.parent->x && edges.from_node.y == edge.to_node.parent->y && edges.to_node.x == edge.to_node.x && edges.to_node.y == edge.to_node.y){
+                                        tree->edges.erase(std::remove(tree->edges.begin(), tree->edges.end(), edge), tree->edges.end());
+                                   }
+
+
+                                }
+
+                                // remove the node from the parent's children
+                                 // remove the children of the parent of the node
+                                for(auto child : edge.to_node.parent->children){
+                                    if(*child == edge.to_node){
+                                        // remove node from node.parent->children
+                                        edge.to_node.parent->children.erase(std::remove(edge.to_node.parent->children.begin(), edge.to_node.parent->children.end(),  edge.to_node),  edge.to_node->children.end());
+                                    
+                                    }
+                                }
+
+                                edge.to_node.parent = &edge.from_node;
+                                edge.to_node.parent_cost = cedge;
+                                edge.to_node.gt = edge.to_node.gt;
+
+
+
                                 // remove edge from connected_vertex and edges
                                 for(auto node : tree->connected_vertex){
                                     if((node.x == edge.to_node.x && node.y == edge.to_node.y) && (node.parent->x == edge.from_node.x && edge.from_node.y == edge.from_node.y) ){
