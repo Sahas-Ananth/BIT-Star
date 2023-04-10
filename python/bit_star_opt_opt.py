@@ -7,7 +7,7 @@ from PIL import Image
 import random
 import matplotlib.pyplot as plt
 import cv2
-import cProfile
+import cProfile, pstats
 import time
 import os
 
@@ -40,6 +40,8 @@ class Node:
         self.g_hat = self.gen_g_hat()
         self.h_hat = self.gen_h_hat()
         self.f_hat = self.g_hat + self.h_hat
+
+        self.children = set()
 
     def gen_g_hat(self):
         return np.linalg.norm(self.np_arr - self.start)
@@ -85,12 +87,16 @@ class Map:
                 return new_node
 
     def get_f_hat_map(self):
+        global start_arr, goal_arr
         map_x, map_y = self.map.shape
         self.f_hat_map = np.zeros((map_x, map_y))
         for x in range(map_x):
             for y in range(map_y):
                 #! Potential BUG: Possible bug here with the Node class not having gt, parent, par_cost initialized.
-                self.f_hat_map[x, y] = Node((x, y)).f_hat
+                f_hat = np.linalg.norm(
+                    np.array([x, y]) - np.array(goal_arr)
+                ) + np.linalg.norm(np.array([x, y]) - np.array(start_arr))
+                self.f_hat_map[x, y] = f_hat
 
 
 class bitstar:
@@ -269,6 +275,7 @@ class bitstar:
                     self.vsol.discard(v)
                     self.unexpanded.discard(v)
                     self.E.discard((v.parent, v))
+                    v.parent.children.remove(v)
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
         self.unconnected.add(self.goal)
@@ -291,6 +298,13 @@ class bitstar:
             node = node.parent
         path.append(self.start.tup)
         return path[::-1], path_length
+    
+    def update_children_gt(self, node):
+        if node.children != []:
+            for c in node.children:
+                c.gt = c.par_cost + node.gt
+                self.update_children_gt(c)
+                
 
     def make_plan(self):
         start = time.time()
@@ -346,10 +360,14 @@ class bitstar:
                                         # tree.remove_edge(tree.parent(xmin), xmin)
                                         # tree.add_edge(vmin, xmin, weight=cedge)
                                         self.E.remove((xmin.parent, xmin))
+                                        xmin.parent.children.remove(xmin)
+
                                         xmin.parent = vmin
                                         xmin.par_cost = cedge
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
+                                        xmin.parent.children.add(xmin)
+                                        self.update_children_gt(xmin)
 
                                     else:
                                         self.V.add(xmin)
@@ -362,6 +380,7 @@ class bitstar:
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
+                                        xmin.parent.children.add(xmin)
 
                                     self.ci = self.goal.gt
                                     if xmin == self.goal:
@@ -411,3 +430,7 @@ if __name__ == "__main__":
     planner = bitstar(start=start, goal=goal, occ_map=map_obj)
     path, path_length = planner.make_plan()
     print(path, path_length)
+
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats("cumtime")
+    stats.print_stats()
