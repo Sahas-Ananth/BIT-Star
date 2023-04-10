@@ -37,7 +37,6 @@ class Node:
         global goal_arr
         self.goal = goal_arr
 
-
         self.g_hat = self.gen_g_hat()
         self.h_hat = self.gen_h_hat()
         self.f_hat = self.g_hat + self.h_hat
@@ -140,11 +139,10 @@ class bitstar:
         #         return np.inf
         #     length += node.par_cost
         #     node = node.parent
-        
+
         # return length
         # TODO: Figure out if this works
         return node.par_cost + node.parent.gt
-
 
     def c_hat(self, node1, node2):
         return np.linalg.norm(node1.np_arr - node2.np_arr)
@@ -234,7 +232,7 @@ class bitstar:
 
     def get_PHS(self):
         map_x, map_y = self.map.map.shape
-        #self.xphs = set(np.argwhere(self.map.f_hat_map <= self.ci))
+        # self.xphs = set(np.argwhere(self.map.f_hat_map <= self.ci))
         self.xphs = set([tuple(x) for x in np.argwhere(self.map.f_hat_map < self.ci)])
         # TODO: Why is self.old_ci being updated here?
         # self.old_ci = self.ci
@@ -306,10 +304,10 @@ class bitstar:
             self.vsol.add(self.start)
             self.ci = 0
             return [self.start.tup], 0
-        
-        try:        
+
+        try:
             while self.ci <= self.old_ci:
-                print("IT", it)
+                # print("IT", it)
                 # print(self.E)
 
                 it += 1
@@ -352,7 +350,7 @@ class bitstar:
                                         xmin.par_cost = cedge
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
-                                        
+
                                     else:
                                         self.V.add(xmin)
                                         # self.add_edge(vmin, xmin, weight=cedge)
@@ -360,13 +358,10 @@ class bitstar:
                                         xmin.par_cost = cedge
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
-                                        self.qv.put(
-                                            (xmin.gt + xmin.h_hat, xmin)
-                                        )
+                                        self.qv.put((xmin.gt + xmin.h_hat, xmin))
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
-                                    
 
                                     self.ci = self.goal.gt
                                     if xmin == self.goal:
@@ -375,6 +370,9 @@ class bitstar:
                                         start = time.time()
                                         solution, length = self.final_solution()
                                         print("Path Length:", length)
+                                        print("Difference:", self.ci - length)
+                                        print(self.old_ci, self.ci)
+                                        self.old_ci = self.ci
 
                     else:
                         self.qe = PriorityQueue()
@@ -394,20 +392,18 @@ class bitstar:
 if __name__ == "__main__":
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     start_arr = np.array([635, 140])
     goal_arr = np.array([350, 400])
 
     start = Node((635, 140), gt=0)
     goal = Node((350, 400))
 
-
     # start_arr = np.array([0, 0])
     # goal_arr = np.array([4, 4])
 
     # start = Node((0, 0), gt=0)
     # goal = Node((4, 4))
-
 
     map_path = f"{os.path.dirname(__file__)}/../gridmaps/occupancy_map.png"
 
