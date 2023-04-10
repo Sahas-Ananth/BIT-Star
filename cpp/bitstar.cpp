@@ -221,6 +221,12 @@ bool Bit_star::intersection_check(Eigen::Vector2d node){
     }
 }
 
+void Bit_star::expand_next_vertex(){
+    Node vmin = vertex_q.top();
+
+    if vmin unexp_vertex
+}
+
 
 
 Node Bit_star::sample(){

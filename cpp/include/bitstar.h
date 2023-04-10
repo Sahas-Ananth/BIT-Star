@@ -34,11 +34,14 @@ private:
 public:
     double x, y;
     double f_hat, g_hat, h_hat; // Estimated costs
+
+
     // actual costs
     double gt;
     double f, g, h;  
     double vertex_weight;           // Actual costs
     Node *parent;
+    double parent_cost = 0.0;
     std::vector<Node *> children;
     bool is_expanded; // We might use this
     Node *start;
@@ -77,6 +80,15 @@ public:
         this->y = y;
         this->start = start;
         this->goal = goal;
+    }
+
+    Node(double x, double y, Node* parent, double gt, double parent_Cost)
+    {
+        this->x = x;
+        this->y = y;
+        this->parent = parent;
+        this->gt = gt;
+        this->parent_cost = parent_Cost;
     }
 
     Node(int x, int y, Node *start, Node *goal)
@@ -141,11 +153,11 @@ class Edge {
         double edge_weight;
 
 
-        Edge(Node from_node, Node to_node, double c_hat){
+        Edge(Node from_node, Node to_node, double edge_weight){
             this->from_node = from_node;
             this->to_node = to_node;
             this->c_hat = c_hat;
-            this->edge_weight = from_node.gt + c_hat  + to_node.h_hat;
+            this->edge_weight = edge_weight;
         }
 
         bool operator<(const Edge& other) const {
@@ -177,44 +189,27 @@ struct NodeComparatorSort {
 
 class Bit_star
 {
-private:
-    
-    Node start;
-    Node goal;
-
-    double Rbit = 100.0;
-    
-    
-    int dimension = 2;
-    
-    double cur_cost = std::numeric_limits<double>::infinity();
-    double old_cost = cur_cost;
-    
-    std::vector<Node> x_phs;
-    int dim = 2;
-    
-    double cmin;
-
-    
-    
-
-
-
 public:
     Bit_star(Node start_node, Node goal_node, Eigen::MatrixXd map)
     {
     start = start_node;
     goal = goal_node;
     this->map = map;
-    
-    // add node  = vert. and self.V = unconnected_vertex
-    this->vert.push_back(start);
-    this->vert.push_back(goal);
-    this->unexp_vertex.push_back(start);
+    this->dim  = 2;
+    this->Rbit = 100.0;
+    this->no_samples = 20;
+    this->ci = std::numeric_limits<double>::infinity();
+    this->old_ci = std::numeric_limits<double>::infinity();
+    this->map_size = map.cols() * map.rows();
 
+
+     // add node  = vert. and self.V = unconnected_vertex
+    this->vert.push_back(start);
     // goal is not connected to the graph and hence unconnected
     this->unconnected_vertex.push_back(goal);
-    this->x_new = this->unconnected_vertex;
+    this->unexp_vertex.push_back(start);
+    this->x_new = this->unconnected_vertex;  
+   
     // TODO: Read map from file
     // Assuming map is a 2D matrix of 10 x 10 for now
 
@@ -222,44 +217,93 @@ public:
     cmin = sqrt(pow(goal.x - start.x, 2) + pow(goal.y - start.y, 2));
     center = { (start.x + goal.x) / 2, (start.y + goal.y) / 2 };
     a1 = { (goal.x - start.x) / cmin, (goal.y - start.y) / cmin };
-    one_1 = {{1, 0}};
 
     map_width = map.rows();
     map_height = map.cols();
-    std::cout << "map_width: " << map_width << std::endl;
-    std::cout << "map_height: " << map_height << std::endl;
     f_hat_map = Eigen::MatrixXd::Zero(map_width, map_height);
+    // store free nodes and obstacles
     free_nodes_map();
+    f_hat_map_data();
+
+
+    this->vertex_q.push(start);
+    get_PHS();
 
    
     }
     
 
     // variables
-    // vertex queue , cost = gt + h_hat of the node.
-    // std::priority_queue<Node> vertex_q;
+    Node start;
+    Node goal;
+    Eigen::MatrixXd map;
+    int dim;
+    double Rbit;
+    int no_samples;
+    double ci;
+    double old_ci;
+    double map_size;
+
+    std::vector<Node> vert;
+    std::vector<Edge> edges;
+    std::vector<Node> x_new;
+    std::vector<Node> x_reuse;
+    std::vector<Node> unexp_vertex;
+    std::vector<Node> unconnected_vertex;
+    std::vector<Node> vsol;
+     // vertex queue , cost = gt + h_hat of the node.
     std::priority_queue<Node, std::vector<Node>, NodeComparator> vertex_q;
-    // std::priority_queue<Node, std::vector<Node>, decltype(&Node::operator())> vertex_q(&Node::operator());
     // edge queue, cost = gt + c_hat + h_hat 
     std::priority_queue<Edge> edge_q;
 
+    double cmin;
+    std::vector<Node> free_nodes;
+    std::vector<Node> occupied;
+    Eigen::MatrixXd f_hat_map;
+
+
+
+
+
+    // functions
+    double a_hat(Node node1, Node node2);
+    void get_PHS();
+    double gt(Node node);
+    double c_hat(Node node1, Node node2);
+    double c(Node node1, Node node2);
+    std::vector<Node> near(Node node, std::vector<Node> search_list);
+    std::vector<double> sample_unit_ball(int d);
+    void expand_next_vertex();
+    Node samplePHS();
+    Node sample();
+    Node sample_map();
+    void prune();
+    std::pair<std::vector<Node>, double> final_solution();
+    void update_children_gt(Node node)
+
+
+
+
+
+
     std::vector<Node> x_reuse;
     std::set<Node> intersection;
-    Eigen::MatrixXd f_hat_map;
+    
     // std::vector<Eigen::Vector2d> xphs;
-    int no_samples = 20;
+    int no_samples;
+    int dim;
+    double Rbit;
     std::vector<Node> x_new;
-    std::vector<Node> vert;
-    std::vector<Edge> edges;
+    
     std::vector<Node> unexp_vertex;
     std::vector<Node> unconnected_vertex;
-    std::vector<Node> free_nodes;   
+       
     // hash table for unconnected vertex
     // std::unordered_map<Node, bool> unconnected_map;
     std::vector<Node> connected_vertex;
     double ci = std::numeric_limits<double>::infinity();
     double old_ci = 0;
-    std::vector<Node> vsol;
+    
     std::vector<Node> xphs;
     Eigen::Vector2d center;
     Eigen::Vector2d  a1;
@@ -269,23 +313,23 @@ public:
     Eigen::MatrixXd map;
     
     // functions
-    double gt(Node node);
+    
     void generate_phs();
-    double c_hat(Node node1, Node node2);
-    std::vector<Node> near(Node node, std::vector<Node> search_list);
-    std::vector<double> sample_unit_ball(int d);
-    void get_PHS();
+    
+    
+    
+    
     void get_f_hat_map();
-    Node sample();
+    
     std::vector<Node> prune();
     std::vector<Eigen::Vector2d> final_solution();
-    void expand_next_vertex();
+    
     std::vector<Node> near(std::vector<Node> search_list, Node node);
     void remove_node(Node *node);
     bool nodeEqual(const Node& n1, const Node& n2);
-    double c(Node node1, Node node2);
-    Node samplePHS();
-    Node sample_map();
+    
+    
+    
     void f_hat_map_data();
     void free_nodes_map();
     bool intersection_check(Eigen::Vector2d node);

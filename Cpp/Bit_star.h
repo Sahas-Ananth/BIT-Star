@@ -75,17 +75,7 @@ public:
         this->g_hat = g_hat;
         this->h_hat = h_hat;
     }
-    Node(double x, double y, double f_hat, double g_hat, double h_hat, double f, double g, double h)
-    {
-        this->x = x;
-        this->y = y;
-        this->f_hat = f_hat;
-        this->g_hat = g_hat;
-        this->h_hat = h_hat;
-        this->f = f;
-        this->g = g;
-        this->h = h;
-    }
+    
     Node(double x, double y, double f_hat, double g_hat, double h_hat, double f, double g, double h, Node *parent)
     {
         this->x = x;
@@ -172,26 +162,7 @@ public:
     std::vector<double, double> a1 = {(goal.x - start.x)/cmin, (goal.y - start.y)/cmin};
 
     }
-    // Bit_star::Bit_star(Node start, Node goal, std::string map_path)
-    // {
-    // this->start = start;
-    // this->goal = goal;
-    // // this->map = cv::imread(map_path, cv::IMREAD_GRAYSCALE);
-
-    // this->vert.push_back(start);
-    // this->unexp_vertex.push_back(start);
-    // // TODO: Read map from file
-    // generate_phs();
-
-    // // For samplePHS
-    
-    // std::vector<double, double> center = {(start.x + goal.x) /2, (start.y + goal.y) /2};
-    // std::vector<double, double> a1 = {(goal.x - start.x)/cmin, (goal.y - start.y)/cmin};
-
-    // }
-
-
-    // variables
+     // variables
     std::priority_queue<Node> vertex_q;
     std::priority_queue<Node> edge_q;
     std::vector<Node> x_reuse;
@@ -204,16 +175,7 @@ public:
     std::vector<Node> vert;
     std::vector<Edge> edges;
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+   
     // functions
     double gt(Node node);
     void generate_phs();
