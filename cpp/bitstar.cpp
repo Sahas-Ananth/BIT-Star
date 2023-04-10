@@ -24,6 +24,7 @@ double Bit_star::gt(Node node)
     {
         return 0.0;
     }
+    //check:  assumed all the nodes in vert are conected?
     if (std::find(this->vert.begin(), this->vert.end(), node) == this->vert.end())
     {
         return std::numeric_limits<double>::infinity();
@@ -33,8 +34,8 @@ double Bit_star::gt(Node node)
     Node *parent = current->parent;
     while(parent->x != start.x && parent->y != start.y)
     {
-        // what is weight here?
-        length = parent->g;
+        // what is weight here - c_hat between current and parent?
+        length = length + c_hat(*current, *parent);
         current = parent;
         parent = current->parent;
     }

@@ -200,6 +200,7 @@ public:
     std::vector<Eigen::Vector2d> xphs;
     int no_samples = 20;
     std::vector<Node> x_new;
+    std::vector<Node> x_near;
     std::vector<Node> vert;
     std::vector<Edge> edges;
 

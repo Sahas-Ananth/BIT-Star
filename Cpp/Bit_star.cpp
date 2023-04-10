@@ -209,6 +209,17 @@ void Bit_star::get_PHS(){
 
 }
 
+void Bit_star::expand_next_vertex(){
+    Node vmin = tree.vertex_queue.top();
+
+    if(std::find(unexp_vertex.begin(), unexp_vertex.end(), connected_nodes[i]) != unexp_vertex.end()){
+                    xnear = near(vmin, unconnected_nodes);
+                }
+                else{
+                    intersect = near(vmin, intersect);
+                }
+}
+
 
 
 bool Bit_star::intersection_check(Eigen::Vector2d node){
