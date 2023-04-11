@@ -196,12 +196,11 @@ public:
     goal = goal_node;
     this->map = map;
     this->dim  = 2;
-    this->Rbit = 100.0;
+    this->Rbit = 3.0;
     this->no_samples = 20;
     this->ci = std::numeric_limits<double>::infinity();
     this->old_ci = std::numeric_limits<double>::infinity();
     this->map_size = map.cols() * map.rows();
-
 
      // add node  = vert. and self.V = unconnected_vertex
     this->vert.push_back(start);
@@ -221,11 +220,10 @@ public:
     map_width = map.rows();
     map_height = map.cols();
     f_hat_map = Eigen::MatrixXd::Zero(map_width, map_height);
+
     // store free nodes and obstacles
     free_nodes_map();
     f_hat_map_data();
-
-
     this->vertex_q.push(start);
     get_PHS();
 
@@ -260,6 +258,12 @@ public:
     std::vector<Node> free_nodes;
     std::vector<Node> occupied;
     Eigen::MatrixXd f_hat_map;
+    int map_width;
+    int map_height;
+    Eigen::Vector2d a1;
+    Eigen::Vector2d center;
+    std::vector<Node> xphs;
+    std::vector<Node> intersection;
 
 
 
@@ -279,58 +283,15 @@ public:
     Node sample_map();
     void prune();
     std::pair<std::vector<Node>, double> final_solution();
-    void update_children_gt(Node node)
-
-
-
-
-
-
-    std::vector<Node> x_reuse;
-    std::set<Node> intersection;
-    
-    // std::vector<Eigen::Vector2d> xphs;
-    int no_samples;
-    int dim;
-    double Rbit;
-    std::vector<Node> x_new;
-    
-    std::vector<Node> unexp_vertex;
-    std::vector<Node> unconnected_vertex;
-       
-    // hash table for unconnected vertex
-    // std::unordered_map<Node, bool> unconnected_map;
-    std::vector<Node> connected_vertex;
-    double ci = std::numeric_limits<double>::infinity();
-    double old_ci = 0;
-    
-    std::vector<Node> xphs;
-    Eigen::Vector2d center;
-    Eigen::Vector2d  a1;
-    std::vector<std::pair<double, double>> one_1;
-    int map_width;
-    int map_height;
-    Eigen::MatrixXd map;
-    
-    // functions
-    
-    void generate_phs();
-    
-    
-    
-    
-    void get_f_hat_map();
-    
-    std::vector<Node> prune();
-    std::vector<Eigen::Vector2d> final_solution();
-    
+    void update_children_gt(Node node);
     std::vector<Node> near(std::vector<Node> search_list, Node node);
     void remove_node(Node *node);
     bool nodeEqual(const Node& n1, const Node& n2);
-    
-    
-    
     void f_hat_map_data();
     void free_nodes_map();
-    bool intersection_check(Eigen::Vector2d node);
+    bool intersection_check(Eigen::Vector2d node);  
+    void generate_phs();
+    void get_f_hat_map();
+    
+    
 };
