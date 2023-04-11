@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 import cv2
 import cProfile, pstats
 import time
+from datetime import datetime
 import os
+import json
 
-random.seed(0)
-np.random.seed(0)
+random.seed(1)
+np.random.seed(1)
 
 global start_arr
 global goal_arr
@@ -24,10 +26,7 @@ class Node:
         self.y = coords[1]
         self.tup = (self.x, self.y)
         self.np_arr = np.array([self.x, self.y])
-        # TODO: Discuss with group about having cost from parent to node. This was weight parameter in the spaghetti code
-        # assert par_cost is not None
-        # assert gt is not None
-        # assert parent is not None
+
         self.parent = parent
         self.par_cost = par_cost
         self.gt = gt
@@ -57,12 +56,15 @@ class Node:
 
 
 class Map:
-    def __init__(self, start, goal, image_path):
+    def __init__(self, start, goal, image_path=None, size=(5, 5)):
         self.start = start
         self.goal = goal
         self.obstacles = set()
         self.dim = 2
-        self.map = np.array(Image.open(image_path))
+        if image_path is None:
+            self.map = np.ones(size)
+        else:
+            self.map = np.array(Image.open(image_path))
         # self.map = np.ones((5, 5))
         ind = np.argwhere(self.map > 0)
         self.free = set(list(map(lambda x: tuple(x), ind)))
@@ -113,6 +115,7 @@ class bitstar:
 
         self.V = set()
         self.E = set()
+        self.E_vis = set()
         self.x_new = set()
         self.x_reuse = set()
         self.unexpanded = set()
@@ -132,22 +135,20 @@ class bitstar:
         self.qv.put((start.gt + start.h_hat, start))
         self.get_PHS()
 
+        self.json_save_dir = (
+            f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/"
+            + str(datetime.now())
+            + "/"
+        )
+        print(self.json_save_dir)
+        os.makedirs(self.json_save_dir, exist_ok=True)
+        self.json_contents = {"edges": [], "final_path": [], "ci": []}
+
     def gt(self, node):
         if node == self.start:
             return 0
         elif node not in self.V:
             return np.inf
-
-        # length = 0
-        # while node != self.start:
-        #     if node.parent is None or node.par_cost == np.inf:
-        #         print(node)
-        #         return np.inf
-        #     length += node.par_cost
-        #     node = node.parent
-
-        # return length
-        # TODO: Figure out if this works
         return node.par_cost + node.parent.gt
 
     def c_hat(self, node1, node2):
@@ -237,7 +238,6 @@ class bitstar:
         return op
 
     def get_PHS(self):
-        map_x, map_y = self.map.map.shape
         # self.xphs = set(np.argwhere(self.map.f_hat_map <= self.ci))
         self.xphs = set([tuple(x) for x in np.argwhere(self.map.f_hat_map < self.ci)])
         # TODO: Why is self.old_ci being updated here?
@@ -275,6 +275,7 @@ class bitstar:
                     self.vsol.discard(v)
                     self.unexpanded.discard(v)
                     self.E.discard((v.parent, v))
+                    self.E_vis.discard((v.parent.tup, v.tup))
                     v.parent.children.remove(v)
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
@@ -289,6 +290,8 @@ class bitstar:
             self.V.remove(n)
 
     def final_solution(self):
+        if self.goal.gt == np.inf:
+            return None, None
         path = []
         path_length = 0
         node = self.goal
@@ -298,18 +301,17 @@ class bitstar:
             node = node.parent
         path.append(self.start.tup)
         return path[::-1], path_length
-    
+
     def update_children_gt(self, node):
-        if node.children != []:
-            for c in node.children:
-                c.gt = c.par_cost + node.gt
-                self.update_children_gt(c)
-                
+        for c in node.children:
+            c.gt = c.par_cost + node.gt
+            self.update_children_gt(c)
 
     def make_plan(self):
         start = time.time()
         unchanged = 0
         it = 0
+        goal_num = 0
 
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
             return None, None
@@ -321,18 +323,19 @@ class bitstar:
 
         try:
             while self.ci <= self.old_ci:
-                # print("IT", it)
-                # print(self.E)
-
                 it += 1
                 if self.qe.empty() and self.qv.empty():
                     self.prune()
+                    self.json_contents["ci"].append(self.ci)
+                    self.json_contents["edges"].append(list(self.E_vis))
+                    current_solution, _ = self.final_solution()
+                    self.json_contents["final_path"].append(current_solution)
+
                     x_sample = set()
 
                     while len(x_sample) < self.m:
                         x_sample.add(self.sample())
 
-                    #! Potential BUG fix: iterate over x_new and set it as Node(tuple, gt, parent, par_cost)
                     self.x_new = self.x_reuse | x_sample
                     self.unconnected = self.unconnected | self.x_new
                     for n in self.V:
@@ -360,12 +363,14 @@ class bitstar:
                                         # tree.remove_edge(tree.parent(xmin), xmin)
                                         # tree.add_edge(vmin, xmin, weight=cedge)
                                         self.E.remove((xmin.parent, xmin))
+                                        self.E_vis.remove((xmin.parent.tup, xmin.tup))
                                         xmin.parent.children.remove(xmin)
 
                                         xmin.parent = vmin
                                         xmin.par_cost = cedge
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
+                                        self.E_vis.add((xmin.parent.tup, xmin.tup))
                                         xmin.parent.children.add(xmin)
                                         self.update_children_gt(xmin)
 
@@ -376,13 +381,21 @@ class bitstar:
                                         xmin.par_cost = cedge
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
+                                        self.E_vis.add((xmin.parent.tup, xmin.tup))
                                         self.qv.put((xmin.gt + xmin.h_hat, xmin))
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
                                         xmin.parent.children.add(xmin)
-
                                     self.ci = self.goal.gt
+
+                                    self.json_contents["ci"].append(self.ci)
+                                    self.json_contents["edges"].append(list(self.E_vis))
+                                    current_solution, _ = self.final_solution()
+                                    self.json_contents["final_path"].append(
+                                        current_solution
+                                    )
+
                                     if xmin == self.goal:
                                         print("\n\nGOAL FOUND")
                                         print("Time Taken:", time.time() - start)
@@ -392,6 +405,23 @@ class bitstar:
                                         print("Difference:", self.ci - length)
                                         print(self.old_ci, self.ci)
                                         self.old_ci = self.ci
+
+                                        json_object = json.dumps(
+                                            self.json_contents, indent=4
+                                        )
+
+                                        # Writing to sample.json
+                                        with open(
+                                            f"{self.json_save_dir}/path{goal_num:02d}.json",
+                                            "w",
+                                        ) as outfile:
+                                            outfile.write(json_object)
+                                        goal_num += 1
+                                        self.json_contents = {
+                                            "edges": [],
+                                            "final_path": [],
+                                            "ci": [],
+                                        }
 
                     else:
                         self.qe = PriorityQueue()
@@ -412,11 +442,11 @@ if __name__ == "__main__":
     profiler = cProfile.Profile()
     profiler.enable()
 
-    start_arr = np.array([635, 140])
-    goal_arr = np.array([350, 400])
+    start_arr = np.array([0, 0])
+    goal_arr = np.array([99, 99])
 
-    start = Node((635, 140), gt=0)
-    goal = Node((350, 400))
+    start = Node((0, 0), gt=0)
+    goal = Node((99, 99))
 
     # start_arr = np.array([0, 0])
     # goal_arr = np.array([4, 4])
@@ -424,10 +454,12 @@ if __name__ == "__main__":
     # start = Node((0, 0), gt=0)
     # goal = Node((4, 4))
 
-    map_path = f"{os.path.dirname(__file__)}/../gridmaps/occupancy_map.png"
+    map_path = (
+        f"{os.path.abspath(os.path.dirname(__file__))}/../gridmaps/occupancy_map.png"
+    )
 
-    map_obj = Map(start=start, goal=goal, image_path=map_path)
-    planner = bitstar(start=start, goal=goal, occ_map=map_obj)
+    map_obj = Map(start=start, goal=goal, size=(100, 100))
+    planner = bitstar(start=start, goal=goal, occ_map=map_obj, no_samples=10, rbit=5)
     path, path_length = planner.make_plan()
     print(path, path_length)
 
