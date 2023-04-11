@@ -1,44 +1,150 @@
-import cv2
+#! /usr/bin/env python3
+#! -*- coding: utf-8 -*-
+
 import numpy as np
+import cv2
+import json
+import os
+from matplotlib.patches import Ellipse
+import matplotlib.pyplot as plt
+import multiprocessing as mp
+from copy import deepcopy
 
-path = [
-    (635, 140),
-    (598.0038741764342, 171.32898763652588),
-    (575.8828239, 166.4704214),
-    (568.8520828210545, 173.22529846166137),
-    (539.6258102728793, 187.30567186808574),
-    (484.9654209, 190.5409749),
-    (428.8742358, 187.930538),
-    (392.4797846, 192.2966827),
-    (297.9432679, 204.7201941),
-    (284.992753, 226.0656544),
-    (272.3471152354237, 256.00050246770945),
-    (238.4665328, 277.0994542),
-    (227.7142709, 292.2697734),
-    (226.78502905912418, 356.5535009422237),
-    (221.8614841, 434.4330007),
-    (216.51399553519954, 454.1344146973525),
-    (248.80665884271514, 463.10096057911807),
-    (284.4549166, 462.9101713),
-    (319.181361498704, 473.1375066581115),
-    (331.173578, 454.4572161),
-    (346.8465449, 433.5021362),
-    (350, 400),
-]
 
-grid = (cv2.imread("./gridmaps/occupancy_map.png") / 255).astype(np.uint8)
+def get_data_from_json(folder, max_iter=np.inf):
+    all_edges, all_cis, all_paths = [], [], []
+    fold_path = f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/{folder}/"
 
-for (x1, y1), (x2, y2) in zip(path[0:-1], path[1:]):
-    cv2.line(grid, (int(y1), int(x1)), (int(y2), int(x2)), (0, 0, 1), 2)
-    cv2.circle(grid, (int(y1), int(x1)), 2, (1, 0, 0), 2)
-    cv2.circle(grid, (int(y2), int(x2)), 2, (1, 0, 0), 2)
+    files = sorted(os.listdir(fold_path))
+    max_iter = min(max_iter, len(files) - 1)
+    for i in range(max_iter):
+        edges, cis, paths = [], [], []
+        with open(fold_path + files[i], "r") as f:
+            data = json.load(f)
+            for edge in data["edges"]:
+                if len(edge) == 0:
+                    continue
+                for j in range(len(edge)):
+                    edges.append((edge[j][0], edge[j][1]))
 
-(ys, xs), (ye, xe) = path[0], path[-1]
-cv2.circle(grid, (int(xs), int(ys)), 2, (1, 1, 0), 2)
-cv2.circle(grid, (int(xe), int(ye)), 2, (0, 1, 0), 2)
+            cis.append(data["ci"])
 
-cv2.imshow("grid", grid * 255)
-cv2.imwrite("./Output/Inefficent_bit_star_grid.png", grid * 255)
+            for path in data["final_path"]:
+                if path is None:
+                    continue
+                for j in range(len(path)):
+                    paths.append(tuple(path[j]))
+            print(f"Loaded {i+1}/{len(files) - 1}", end="\r")
 
-if cv2.waitKey(0) & 0xFF == ord("q"):
-    cv2.destroyAllWindows()
+        all_edges.append(np.array(edges))
+        all_cis.append(np.array(cis).squeeze())
+        all_paths.append(np.array(paths))
+
+    return all_edges, all_cis, all_paths
+
+
+def draw_ellipse(ci):
+    if ci == np.inf:
+        return
+    cmin = np.linalg.norm(goal_arr - start_arr)
+    center = (start_arr + goal_arr) / 2.0
+    r1 = ci
+    r2 = np.sqrt(ci**2 - cmin**2)
+    theta = np.arctan2(goal[1] - start[1], goal[0] - start[0])
+    theta = np.degrees(theta)
+    plt.gca().add_patch(
+        Ellipse(center, r1, r2, theta, color="blue", fill=False, lw=5, ls="--")
+    )
+
+
+def grow_edges():
+    pass
+
+
+def draw_edges(edges):
+    x1, y1, x2, y2 = edges[:, 0, 0], edges[:, 0, 1], edges[:, 1, 0], edges[:, 1, 1]
+    plt.plot(
+        [y1, y2],
+        [x1, x2],
+        color="red",
+        linewidth=1,
+        marker="x",
+        markersize=4,
+        markerfacecolor="blue",
+        markeredgecolor="blue",
+    )
+
+
+def draw_tree(it, copy_image):
+    print(f"Process started for iteration {it} at {mp.current_process().name}")
+    img_folder = (
+        f"{os.path.abspath(os.path.dirname(__file__))}/../Output/PyViz/{experiment}/"
+    )
+    plt.figure(figsize=(20, 20))
+    # plt.imshow(cv2.cvtColor(copy_image, cv2.COLOR_BGR2RGB))
+
+    plt.axis("off")
+    plt.title(f"Iteration {it}", fontsize=30)
+
+    draw_ellipse(unique_cis[it][1])
+    draw_edges(e[it])
+
+    plt.plot(start[0], start[1], color="green", marker="o", markersize=10)
+    plt.plot(goal[0], goal[1], color="orange", marker="o", markersize=10)
+
+    os.makedirs(
+        img_folder,
+        exist_ok=True,
+    )
+    plt.savefig(
+        f"{img_folder}iter_{it:02d}.png",
+        bbox_inches="tight",
+        pad_inches=0.4,
+    )
+    plt.axis("off")
+    plt.close()
+    return f"{img_folder}iter_{it:02d}.png"
+
+
+experiment = "2023-04-11 16:55:45.976899"
+e, c, p = get_data_from_json(experiment)
+unique_edges = []
+unique_cis = []
+unique_paths = []
+for i in range(len(c)):
+    unique_edges.append(np.unique(e[i], axis=0))
+    unique_cis.append(np.unique(c[i]))
+    unique_paths.append(np.unique(p[i], axis=0))
+
+print("Unique edges: ", len(unique_edges[i]))
+print("Unique cis: ", len(unique_cis[i]))
+print("Unique paths: ", len(unique_paths[i]))
+
+# image = cv2.imread(
+#     f"{os.path.abspath(os.path.dirname(__file__))}/../gridmaps/occupancy_map.png"
+# )
+
+image = np.ones((100, 100, 3), dtype=np.uint8) * 255
+
+copy_image = image.copy()
+
+start = (0, 0)
+goal = (99, 99)
+start_arr = np.array(start)
+goal_arr = np.array(goal)
+
+print("\n\nPlotting...")
+
+processes = []
+output = mp.Queue()
+for i in range(len(e)):
+    process = mp.Process(target=draw_tree, args=(i, image.copy()))
+    processes.append(process)
+    process.start()
+
+for process in processes:
+    print(f"Process {process.name} joined")
+    process.join()
+
+
+# TODO: Fix threading issue with matplotlib https://stackoverflow.com/questions/31719138/matplotlib-cant-render-multiple-contour-plots-on-django
