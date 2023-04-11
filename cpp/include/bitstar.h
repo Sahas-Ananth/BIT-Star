@@ -37,7 +37,8 @@ public:
 
 
     // actual costs
-    double gt;
+    double gt = std::numeric_limits<double>::infinity();
+    //inf
     double f, g, h;  
     double vertex_weight;           // Actual costs
     Node *parent;
@@ -74,6 +75,50 @@ public:
         this->children = {};
 
     }
+
+   
+
+
+    Node(double x, double y, bool self_calculate)
+    {
+        this->x = x;
+        this->y = y;
+        this->start = start;
+        // this->gt = 
+        if(self_calculate)
+        {
+            this->g_hat_cal();
+            // this->h_hat_cal();
+            this->h_hat = 0.0;
+            this->f_hat_cal();
+            this->vertex_weight = this->gt  + this->h_hat;
+        }
+    }
+
+    Node(double x, double y, double gt, double g_hat)
+    {
+        this->x = x;
+        this->y = y;
+        this->gt = gt;
+        this->g_hat = g_hat;       
+    }
+
+    Node(double x, double y, Node *start,  bool self_calculate)
+    {
+        this->x = x;
+        this->y = y;
+        this->start = start;
+        // this->gt = 
+        if(self_calculate)
+        {
+            this->g_hat_cal();
+            // this->h_hat_cal();
+            this->h_hat = 0.0;
+            this->f_hat_cal();
+            this->vertex_weight = this->gt  + this->h_hat;
+        }
+    }
+   
     Node(double x, double y, Node *start, Node *goal)
     {
         this->x = x;
@@ -81,6 +126,7 @@ public:
         this->start = start;
         this->goal = goal;
     }
+
 
     Node(double x, double y, Node* parent, double gt, double parent_Cost)
     {
@@ -97,6 +143,21 @@ public:
         this->y = static_cast<double>(y);
         this->start = start;
         this->goal = goal;
+    }
+
+    Node(double x, double y, Node *start, Node *goal, bool self_calculate)
+    {
+        this->start = start;
+        this->goal = goal;
+        this->x = x;
+        this->y = y;
+        if(self_calculate)
+        {
+            this->g_hat_cal();
+            this->h_hat_cal();
+            this->f_hat_cal();
+            this->vertex_weight = this->gt  + this->h_hat;
+        }
     }
 
     Node(double x, double y, Node *start, Node *goal, double gt,  bool self_calculate)
@@ -147,13 +208,13 @@ public:
 
 class Edge {
     public:
-        Node from_node;
-        Node to_node;
+        Node *from_node;
+        Node *to_node;
         double c_hat;
         double edge_weight;
 
 
-        Edge(Node from_node, Node to_node, double edge_weight){
+        Edge(Node *from_node, Node *to_node, double edge_weight){
             this->from_node = from_node;
             this->to_node = to_node;
             this->c_hat = c_hat;
@@ -273,7 +334,7 @@ public:
     double a_hat(Node node1, Node node2);
     void get_PHS();
     double gt(Node node);
-    double c_hat(Node node1, Node node2);
+    double c_hat(Node *node1, Node *node2);
     double c(Node node1, Node node2);
     std::vector<Node> near(Node node, std::vector<Node> search_list);
     std::vector<double> sample_unit_ball(int d);
@@ -294,4 +355,11 @@ public:
     void get_f_hat_map();
     
     
+
+
+    // debug variables
+    std::vector<Edge> debug_edges;
+
+
+
 };

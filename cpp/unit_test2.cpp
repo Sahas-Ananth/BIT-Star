@@ -97,8 +97,8 @@ Node Bit_star::samplePHS(){
         }
 
    }
-
-    Node xrand = Node(output(0), output(1), &start, &goal);
+    // Node node = Node(x, y, &start, &goal, true);
+    Node xrand = Node(output(0), output(1), &start, &goal, true);
   
     return xrand;
 
@@ -107,6 +107,8 @@ Node Bit_star::samplePHS(){
 
 Node Bit_star::sample_map(){
 
+    // print sample map started
+    // std::cout << "sample map started" << std::endl;
     while(true){
 
         std::random_device rd;
@@ -118,14 +120,12 @@ Node Bit_star::sample_map(){
 
         if (map(int(x), int(y)) > 0){
 
-            Node node = Node(x, y, &start, &goal);
+            Node node = Node(x, y, &start, &goal, true);
             return node;
 
         }
 
     }
-
-
 
 }
 
@@ -189,7 +189,7 @@ Node Bit_star::sample(){
     }
 
     if(xphs.size() < map_size){
-        
+        std::cout << "sample phs" << std::endl;
         xrand = samplePHS();
 
     }
@@ -208,7 +208,7 @@ std::vector<Node> Bit_star::near(std::vector<Node> search_list, Node node){
     std::vector<Node> near_list;
     for (int i = 0; i < search_list.size(); i++)
     {
-        if ((c_hat(search_list[i], node) <= Rbit) && (search_list[i].x != node.x && search_list[i].y != node.y))
+        if ((c_hat(&search_list[i], &node) <= Rbit) && (search_list[i].x != node.x && search_list[i].y != node.y))
         {
             near_list.push_back(search_list[i]);
         }
@@ -265,7 +265,7 @@ void Bit_star::prune(){
                 // remove node from edges
                 for (int i = 0; i < this->edges.size(); i++)
                 {
-                    if (this->edges[i].to_node == *node.parent || this->edges[i].from_node == node)
+                    if (this->edges[i].to_node == node.parent || this->edges[i].from_node == &node)
                     {
                         this->edges.erase(this->edges.begin() + i);
                     }
@@ -338,36 +338,85 @@ void Bit_star::expand_next_vertex()
     vertex_q.pop();
     std::vector<Node> near_list;
     std::cout << "vmin: " << vmin.x << "," << vmin.y << std::endl;
+
+    // p[rint unexp_vertex size
+    std::cout << "unexp_vertex size: " << this->unexp_vertex.size() << std::endl;
+
     // check if vmin is in unexp_vertex
     if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), vmin) != this->unexp_vertex.end())
     {
+
+        std::cout << "vmin is in unexp_vertex" << std::endl;
         near_list = near(this->unconnected_vertex, vmin);
     }
     else
     {   
         
+        std::cout << "vmin is not in unexp_vertex" << std::endl;
+
         std::vector<Node> intersect;
 
+        // // print all valuesin x_new
+        std::cout << "x_new size: " << x_new.size() << std::endl;
+        // for(auto node : x_new){
+        //     std::cout << node.x << "," << node.y << std::endl;
+        // }
+
+        // // print all values in unconnected_vertex
+        std::cout << "unconnected_vertex size: " << unconnected_vertex.size() << std::endl;
+        // for(auto node : unconnected_vertex){
+        //     std::cout << node.x << "," << node.y << std::endl;
+        // }
+
+        
+
         std::set<Node> set_x_new(x_new.begin(), x_new.end());
+
+        // print set_x_new
+        std::cout << "set_x_new size: " << set_x_new.size() << std::endl;
+        // for(auto node : set_x_new){
+        //     std::cout << node.x << "," << node.y << std::endl;
+        // }
+
+        
+
+
+
         std::set<Node> set_unconnected_vertex(unconnected_vertex.begin(), unconnected_vertex.end());
+        
+        // print set_unconnected_vertex
+        std::cout << "set_unconnected_vertex size: " << set_unconnected_vertex.size() << std::endl;
+        // for(auto node : set_unconnected_vertex){
+        //     std::cout << node.x << "," << node.y << std::endl;
+        // }
+        
+        
         std::set_intersection(set_x_new.begin(), set_x_new.end(),
                             set_unconnected_vertex.begin(), set_unconnected_vertex.end(),
                             std::inserter(intersect, intersect.begin()));
+        std::cout << "intersect size: " << intersect.size() << std::endl;
 
 
         near_list = near(intersect, vmin);
 
     }
 
+    std::cout << "near_list size: " << near_list.size() << std::endl;
+
     for(auto near : near_list){
-        
+        std::cout << "near: " << near.x << "," << near.y << std::endl;
+        std::cout << "a_hat(vmin, near): " << a_hat(vmin, near) << std::endl;
         if(a_hat(vmin, near) < ci) {
 
             double cost = vmin.gt + c(vmin, near) + near.h_hat;
-            Edge edge = Edge(vmin, near, cost);
+            Edge edge = Edge(&vmin, &near, cost);
+            std::cout << "edge cost: " << edge.edge_weight << std::endl;
+            std::cout << "edge: " << edge.from_node->x << "," << edge.from_node->y << " -> " << edge.to_node->x << "," << edge.to_node->y << std::endl;
             this->edge_q.push(edge);
         }
     }
+
+    std::cout << "edge_q size in expAND: " << this->edge_q.size() << std::endl;
 
     // check if vmin is in unexp_vertex
     if (std::find(this->unexp_vertex.begin(), this->unexp_vertex.end(), vmin) != this->unexp_vertex.end())
@@ -376,13 +425,13 @@ void Bit_star::expand_next_vertex()
         for(auto near : v_near){
 
             // check if the edge exist in edges
-            if (std::find(this->edges.begin(), this->edges.end(), Edge(vmin, near, c_hat(vmin, near))) == this->edges.end())
+            if (std::find(this->edges.begin(), this->edges.end(), Edge(&vmin, &near, c_hat(&vmin, &near))) == this->edges.end())
             {
-                if((a_hat(vmin, near) < ci ) && (near.g_hat + c_hat(vmin, near) < near.gt)){
+                if((a_hat(vmin, near) < ci ) && (near.g_hat + c_hat(&vmin, &near) < near.gt)){
 
 
                     double cost = vmin.gt + c(vmin, near) + near.h_hat;
-                    Edge edge = Edge(vmin, near, cost);
+                    Edge edge = Edge(&vmin, &near, cost);
                     this->edge_q.push(edge);
                 }
                 
@@ -395,14 +444,14 @@ void Bit_star::expand_next_vertex()
     }
 }
 
-double Bit_star::c_hat(Node node1, Node node2)
+double Bit_star::c_hat(Node *node1, Node *node2)
 {
-    return sqrt(pow(node1.x - node2.x, 2) + pow(node1.y - node2.y, 2));
+    return sqrt(pow(node1->x - node2->x, 2) + pow(node1->y - node2->y, 2));
 }
 
 double Bit_star::a_hat(Node node1, Node node2)
 {
-    return node1.g_hat + c_hat(node1, node2) + node2.h_hat;
+    return node1.g_hat + c_hat(&node1, &node2) + node2.h_hat;
 }
 
 double Bit_star::c(Node node1, Node node2)
@@ -428,7 +477,7 @@ double Bit_star::c(Node node1, Node node2)
     
 
     }
-    return c_hat(node1, node2); 
+    return c_hat(&node1, &node2); 
 }
 double Bit_star::gt(Node node)
 {
@@ -442,18 +491,6 @@ double Bit_star::gt(Node node)
     {
         return std::numeric_limits<double>::infinity();
     }
-    // double length = 0.0;
-    // Node *current = &node;
-    // Node *parent = current->parent;
-    // while(parent->x != start.x && parent->y != start.y)
-    // {
-    //     // what is weight here - c_hat between current and parent?
-    //     length = length + c_hat(*current, *parent);
-    //     current = parent;
-    //     parent = current->parent;
-    // }
-    // return length;
-
     return node.parent_cost + node.parent->gt;
 
 }
@@ -471,8 +508,16 @@ bool Bit_star::nodeEqual(const Node& n1, const Node& n2) {
 int main()
 {
     
-    Node* start = new Node(0.0, 0.0);
-    Node* goal = new Node(9.0, 9.0);
+    Node* start = new Node(0.0, 0.0, 0.0, 0.0);
+
+    Node* goal = new Node(9.0, 9.0, start, true);
+    start->h_hat = sqrt(pow(start->x - goal->x, 2) + pow(start->y -goal->y, 2));
+
+    // print goal's g_hat, h_hat and f_hat
+    std::cout << "goal's g_hat: " << goal->g_hat << std::endl;
+    std::cout << "goal's h_hat: " << goal->h_hat << std::endl;
+    std::cout << "goal's f_hat: " << goal->f_hat << std::endl;
+
     Eigen::MatrixXd map = Eigen::MatrixXd::Ones(10, 10);
 
     Bit_star *tree = new Bit_star(*start, *goal, map);
@@ -524,13 +569,20 @@ int main()
 
             }
             std::cout << "x_sampling size: " << x_sampling.size() << std::endl;
+            // print all the nodes in x_sampling
+            // for(auto node : x_sampling){
+            //     std::cout << "x_sampling: " << node.x << ", " << node.y << std::endl;
+            // }
 
             for(auto node : x_sampling){
                 tree->x_new.push_back(node);
             }
+            std::cout << "x_new size: " << tree->x_new.size() << std::endl;
+
             for(auto node : tree->x_reuse){
                 tree->x_new.push_back(node);
             }
+            std::cout << "x_new size: " << tree->x_new.size() << std::endl;
             // remove duplicates
             // sort x_new
             // CHECK:  is this sorting correct?
@@ -591,58 +643,79 @@ int main()
         if(!(tree->edge_q.empty())){
             
             Edge top_edge = tree->edge_q.top();
-            tree->edge_q.pop();
+            
 
-            if(top_edge.from_node.gt + tree->c_hat(top_edge.from_node, top_edge.to_node) + top_edge.to_node.h_hat < tree->ci){
-                if(top_edge.from_node.gt + tree->c_hat(top_edge.from_node, top_edge.to_node) < top_edge.to_node.gt){
-                   
-                    double cedge = tree->c(top_edge.from_node, top_edge.to_node);
-                    if(top_edge.from_node.gt + cedge + top_edge.to_node.h_hat < tree->ci){
+            // print top_edge
+            std::cout << "top_edge: " << top_edge.from_node->x << ", " << top_edge.from_node->y << " to " << top_edge.to_node->x << ", " << top_edge.to_node->y << std::endl;
+            std::cout << "top_edge.from_node.gt: " << top_edge.from_node->gt << std::endl;
+            std::cout << "c_hat: " << tree->c_hat(top_edge.from_node, top_edge.to_node) << std::endl;
+            std::cout << "top_edge.to_node.h_hat: " << top_edge.to_node->h_hat << std::endl;
+            std::cout << "tree->ci: " << tree->ci << std::endl;
 
-                        if(top_edge.from_node.gt + cedge < top_edge.to_node.gt){
+            if(top_edge.from_node->gt + tree->c_hat(top_edge.from_node, top_edge.to_node) + top_edge.to_node->h_hat < tree->ci){
+                
+                std::cout << "first if" << std::endl;
+                if(top_edge.from_node->gt + tree->c_hat(top_edge.from_node, top_edge.to_node) < top_edge.to_node->gt){
+                    std::cout << "second if" << std::endl;
+                    double cedge = tree->c(*top_edge.from_node, *top_edge.to_node);
+                    if(top_edge.from_node->gt + cedge + top_edge.to_node->h_hat < tree->ci){
+                        std::cout << "third if" << std::endl;
+                        if(top_edge.from_node->gt + cedge < top_edge.to_node->gt){
+                            std::cout << "fourth if" << std::endl;
                         //    check if to_node exists in connected_vertex
-                            if (std::find(tree->vert.begin(), tree->vert.end(), top_edge.to_node) != tree->vert.end())
+                            if (std::find(tree->vert.begin(), tree->vert.end(), *top_edge.to_node) != tree->vert.end())
                             {
 
                                 // remove to_node.parent and to_node from edges
                                 for(auto edges : tree->edges){
-                                   if(edges.from_node.x == top_edge.to_node.parent->x && edges.from_node.y == top_edge.to_node.parent->y && edges.to_node.x == top_edge.to_node.x && edges.to_node.y == top_edge.to_node.y){
-                                        tree->edges.erase(std::remove(tree->edges.begin(), tree->edges.end(), edges), tree->edges.end());
-                                   }
-
-
+                                    if(top_edge.to_node->parent != NULL) {
+                                        if (edges.from_node->x == top_edge.to_node->parent->x &&
+                                            edges.from_node->y == top_edge.to_node->parent->y &&
+                                            edges.to_node->x == top_edge.to_node->x &&
+                                            edges.to_node->y == top_edge.to_node->y) {
+                                            tree->edges.erase(
+                                                    std::remove(tree->edges.begin(), tree->edges.end(), edges),
+                                                    tree->edges.end());
+                                        }
+                                    }
                                 }
 
                                 // remove the node from the parent's children
                                  // remove the children of the parent of the node
-                                for(auto child : top_edge.to_node.parent->children){
-                                    if(*child == top_edge.to_node){
-                                        // remove node from node.parent->children
-                                        top_edge.to_node.parent->children.erase(std::remove(top_edge.to_node.parent->children.begin(), top_edge.to_node.parent->children.end(),  &top_edge.to_node),  top_edge.to_node.parent->children.end());
-                                    
+                                if(top_edge.to_node->parent != NULL) {
+                                    for (auto child: top_edge.to_node->parent->children) {
+                                        if (*child == *top_edge.to_node) {
+                                            // remove node from node.parent->children
+                                            top_edge.to_node->parent->children.erase(
+                                                    std::remove(top_edge.to_node->parent->children.begin(),
+                                                                top_edge.to_node->parent->children.end(),
+                                                                top_edge.to_node),
+                                                    top_edge.to_node->parent->children.end());
+                                        }
                                     }
                                 }
 
-                                top_edge.to_node.parent = &top_edge.from_node;
-                                top_edge.to_node.parent_cost = cedge;
-                                top_edge.to_node.gt = top_edge.to_node.gt;
+                                top_edge.to_node->parent = top_edge.from_node;
+                                 std::cout << "top_edge.to_node.parent: " << top_edge.to_node->parent->x << ", " << top_edge.to_node->parent->y << std::endl;
+                                top_edge.to_node->parent_cost = cedge;
+                                top_edge.to_node->gt = tree->gt(*top_edge.to_node);
 
                                 // add edge between to_node's parent abd to_node
-                                double cost = top_edge.to_node.parent->gt + tree->c(*top_edge.to_node.parent, top_edge.to_node) + top_edge.to_node.h_hat;
-                                Edge e = Edge(*top_edge.to_node.parent, top_edge.to_node, cost);
+                                double cost = top_edge.to_node->parent->gt + tree->c(*top_edge.to_node->parent, *top_edge.to_node) + top_edge.to_node->h_hat;
+                                Edge e = Edge(top_edge.from_node, top_edge.to_node, cost);
                                 tree->edges.push_back(e);
 
                                 // add to_node to vertex_q
-                                tree->vertex_q.push(top_edge.to_node);
+                                tree->vertex_q.push(*top_edge.to_node);
 
                                 // add to_node to unexp_vertex
-                                tree->unexp_vertex.push_back(top_edge.to_node);
+                                tree->unexp_vertex.push_back(*top_edge.to_node);
 
                                 // add to_node to to_node.parent->children
-                                top_edge.to_node.parent->children.push_back(&top_edge.to_node);
+                                top_edge.to_node->parent->children.push_back(top_edge.to_node);
 
                                 // update to_node's children's gt
-                                tree->update_children_gt(top_edge.to_node);
+                                tree->update_children_gt(*top_edge.to_node);
 
                             }
 
@@ -650,30 +723,35 @@ int main()
 
 
                                 // add to_node to vert
-                                tree->vert.push_back(top_edge.to_node);
+                                tree->vert.push_back(*top_edge.to_node);
+                                
                                 // to_nodes parent is from_node
-                                top_edge.to_node.parent = &top_edge.from_node;
-                                top_edge.to_node.parent_cost = cedge;
-                                top_edge.to_node.gt = top_edge.to_node.gt;
+                                top_edge.to_node->parent = top_edge.from_node;
+                                // print top edge to_node's parent
+                                std::cout << "top_edge.to_node.parent: " << top_edge.to_node->parent->x << ", " << top_edge.to_node->parent->y << std::endl;
+                                top_edge.to_node->parent_cost = cedge;
+                                top_edge.to_node->gt = tree->gt(*top_edge.to_node);
 
                                 // add edge between to_node's parent abd to_node
-                                double cost = top_edge.to_node.parent->gt + tree->c(*top_edge.to_node.parent, top_edge.to_node) + top_edge.to_node.h_hat;
-                                Edge e = Edge(*top_edge.to_node.parent, top_edge.to_node, cost);
+                                double cost = top_edge.to_node->parent->gt + tree->c(*top_edge.to_node->parent, *top_edge.to_node) + top_edge.to_node->h_hat;
+                                Edge e = Edge(top_edge.to_node->parent, top_edge.to_node, cost);
                                 tree->edges.push_back(e);
 
+                                
+
                                 // add to_node to vertex_q
-                                tree->vertex_q.push(top_edge.to_node);
+                                tree->vertex_q.push(*top_edge.to_node);
 
                                 // add to_node to unexp_vertex
-                                tree->unexp_vertex.push_back(top_edge.to_node);
+                                tree->unexp_vertex.push_back(*top_edge.to_node);
 
                                 //check if to_node is the goal
-                                if(top_edge.to_node.x == goal->x && top_edge.to_node.y == goal->y){
-                                    tree->vsol.push_back(top_edge.to_node);
+                                if(top_edge.to_node->x == goal->x && top_edge.to_node->y == goal->y){
+                                    tree->vsol.push_back(*top_edge.to_node);
                                 }
 
                                 // add to_node to to_node.parent->children
-                                top_edge.to_node.parent->children.push_back(&top_edge.to_node);
+                                top_edge.to_node->parent->children.push_back(top_edge.to_node);
 
 
 
@@ -699,7 +777,7 @@ int main()
 
 
                             tree->ci = goal->gt;
-                            if(top_edge.to_node.x == goal->x && top_edge.to_node.y == goal->y){
+                            if(top_edge.to_node->x == goal->x && top_edge.to_node->y == goal->y){
 
                                     std::cout << "goal found" << std::endl;
 
@@ -740,7 +818,7 @@ int main()
             }
 
 
-
+            tree->edge_q.pop();
 
         }
         else{
