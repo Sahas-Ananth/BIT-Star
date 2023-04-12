@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+# 072427
 from queue import PriorityQueue
 import numpy as np
 from PIL import Image
@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 import os
 import json
+import copy
 
 random.seed(1)
 np.random.seed(1)
@@ -126,13 +127,15 @@ class bitstar:
         self.qv = PriorityQueue()
         self.qe = PriorityQueue()
         self.qe_order = 0
+        self.qv_order = 0
 
         self.V.add(start)
         self.unconnected.add(goal)
         self.unexpanded = self.V.copy()
         self.x_new = self.unconnected.copy()
 
-        self.qv.put((start.gt + start.h_hat, start))
+        self.qv.put((start.gt + start.h_hat, self.qv_order, start))
+        self.qv_order += 1
         self.get_PHS()
 
         self.json_save_dir = (
@@ -180,7 +183,9 @@ class bitstar:
 
     def expand_next_vertex(self):
         #! Potential BUG: Somewhere here or in near when we add node we must send it with gt, parent, par_cost initialized.
-        vmin = self.qv.get(False)[1]
+        vmin = self.qv.get(False)[2]
+
+                
         x_near = None
         if vmin in self.unexpanded:
             x_near = self.near(self.unconnected, vmin)
@@ -229,11 +234,14 @@ class bitstar:
         r = np.array([r1] + rn)
 
         while True:
-            x_ball = self.sample_unit_ball()
-            op = np.matmul(np.matmul(cwe, r), x_ball) + center
-            op = np.around(op, 7)
-            if (int(op[0]), int(op[1])) in self.intersection:
-                break
+            try:
+                x_ball = self.sample_unit_ball()
+                op = np.matmul(np.matmul(cwe, r), x_ball) + center
+                op = np.around(op, 7)
+                if (int(op[0]), int(op[1])) in self.intersection:
+                    break
+            except:
+                print(op, x_ball, r, cmin, self.ci, cwe)
 
         return op
 
@@ -282,7 +290,7 @@ class bitstar:
         self.unconnected.add(self.goal)
 
     def remove_children(self, n):
-        connected = set(self.successors(n))
+        connected = n.children
         if connected != []:
             for c in connected:
                 self.remove_children(c)
@@ -339,7 +347,8 @@ class bitstar:
                     self.x_new = self.x_reuse | x_sample
                     self.unconnected = self.unconnected | self.x_new
                     for n in self.V:
-                        self.qv.put((n.gt + n.h_hat, n))
+                        self.qv.put((n.gt + n.h_hat, self.qv_order, n))
+                        self.qv_order += 1
                 while True:
                     if self.qv.empty():
                         break
@@ -382,11 +391,13 @@ class bitstar:
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
                                         self.E_vis.add((xmin.parent.tup, xmin.tup))
-                                        self.qv.put((xmin.gt + xmin.h_hat, xmin))
+                                        self.qv.put((xmin.gt + xmin.h_hat, self.qv_order, xmin))
+                                        self.qv_order += 1
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
                                         xmin.parent.children.add(xmin)
+                                        self.unconnected.remove(xmin)
                                     self.ci = self.goal.gt
 
                                     self.json_contents["ci"].append(self.ci)
