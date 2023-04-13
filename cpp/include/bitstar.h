@@ -250,7 +250,7 @@ public:
         goal = goal_node;
         this->map = map;
         this->dim  = 2;
-        this->Rbit = 2.5;
+        this->Rbit = 10;
         this->no_samples = 20;
         this->ci = std::numeric_limits<double>::infinity();
         this->old_ci = std::numeric_limits<double>::infinity();

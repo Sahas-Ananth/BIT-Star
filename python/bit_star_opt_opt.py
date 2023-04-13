@@ -64,6 +64,11 @@ class Map:
         self.dim = 2
         if image_path is None:
             self.map = np.ones(size)
+            print("taking the map")
+            
+            self.map[20:60, 40:80] = 0
+
+
         else:
             self.map = np.array(Image.open(image_path))
         # self.map = np.ones((5, 5))
@@ -179,6 +184,7 @@ class bitstar:
         for n in search_set:
             if (self.c_hat(n, node) <= self.rbit) and (n != node):
                 near.add(n)
+        print("near_list size:", len(near))
         return near
 
     def expand_next_vertex(self):
@@ -192,6 +198,7 @@ class bitstar:
         else:
             intersect = self.unconnected & self.x_new
             x_near = self.near(intersect, vmin)
+            print("x_near size:", len(x_near))
 
         for x in x_near:
             if self.a_hat(vmin, x) < self.ci:
@@ -202,6 +209,7 @@ class bitstar:
 
         if vmin in self.unexpanded:
             v_near = self.near(self.V, vmin)
+            print("v_near size:", len(v_near))
             for v in v_near:
                 if (
                     (not (vmin, v) in self.E)
@@ -433,6 +441,10 @@ class bitstar:
                                             "final_path": [],
                                             "ci": [],
                                         }
+
+                                        # print solution
+                                        for i in range(len(solution)):
+                                            print(solution[i], end=", ")
 
                     else:
                         self.qe = PriorityQueue()
