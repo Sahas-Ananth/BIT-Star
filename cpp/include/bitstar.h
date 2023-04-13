@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <set>
+#include <opencv2/opencv.hpp>
 
 class Node
 {
@@ -35,18 +36,18 @@ public:
     double x, y;
     double f_hat, g_hat, h_hat; // Estimated costs
 
-
+    double parent_cost;
     // actual costs
     double gt = std::numeric_limits<double>::infinity();
     //inf
-    double f, g, h;  
     double vertex_weight;           // Actual costs
-    Node *parent;
-    double parent_cost = 0.0;
-    std::vector<Node *> children;
+    
+    
+    std::vector<Node> children;
     bool is_expanded; // We might use this
     Node *start;
     Node *goal;
+    std::vector<Node> parent;
     Node()
     {
         this->x = 0.0;
@@ -54,13 +55,12 @@ public:
         this->f_hat = 0.0;
         this->g_hat = 0.0;
         this->h_hat = 0.0;
-        this->f = 0.0;
-        this->g = 0.0;
-        this->h = 0.0;
-        this->parent = NULL;
+        this->parent = {};
         this->is_expanded = false;
         this->children = {};
+        this->parent_cost = 5.0;
     }
+
     Node(double x, double y)
     {
         this->x = x;
@@ -68,10 +68,7 @@ public:
         this->f_hat = 0.0;
         this->g_hat = 0.0;
         this->h_hat = 0.0;
-        this->f = 0.0;
-        this->g = 0.0;
-        this->h = 0.0;
-        this->parent = NULL;
+        this->parent = {};
         this->children = {};
 
     }
@@ -128,11 +125,11 @@ public:
     }
 
 
-    Node(double x, double y, Node* parent, double gt, double parent_Cost)
+    Node(double x, double y, Node parent, double gt, double parent_Cost)
     {
         this->x = x;
         this->y = y;
-        this->parent = parent;
+        this->parent.push_back(parent);
         this->gt = gt;
         this->parent_cost = parent_Cost;
     }
@@ -179,17 +176,14 @@ public:
     }
     
    
-    Node(double x, double y, double f_hat, double g_hat, double h_hat, double f, double g, double h, Node *parent, Node *child, Node *start, Node *goal)
+    Node(double x, double y, double f_hat, double g_hat, double h_hat, double f, double g, double h, Node parent, Node child, Node *start, Node *goal)
     {
         this->x = x;
         this->y = y;
         this->f_hat = f_hat;
         this->g_hat = g_hat;
         this->h_hat = h_hat;
-        this->f = f;
-        this->g = g;
-        this->h = h;
-        this->parent = parent;
+        this->parent.push_back(parent);
         this->children.push_back(child);
         this->start = start;
         this->goal = goal;
@@ -208,16 +202,14 @@ public:
 
 class Edge {
     public:
-        Node *from_node;
-        Node *to_node;
-        double c_hat;
+        Node from_node;
+        Node to_node;
         double edge_weight;
 
 
-        Edge(Node *from_node, Node *to_node, double edge_weight){
+        Edge(Node from_node, Node to_node, double edge_weight){
             this->from_node = from_node;
             this->to_node = to_node;
-            this->c_hat = c_hat;
             this->edge_weight = edge_weight;
         }
 
@@ -253,45 +245,46 @@ class Bit_star
 public:
     Bit_star(Node start_node, Node goal_node, Eigen::MatrixXd map)
     {
-    start = start_node;
-    goal = goal_node;
-    this->map = map;
-    this->dim  = 2;
-    this->Rbit = 3.0;
-    this->no_samples = 20;
-    this->ci = std::numeric_limits<double>::infinity();
-    this->old_ci = std::numeric_limits<double>::infinity();
-    this->map_size = map.cols() * map.rows();
 
-     // add node  = vert. and self.V = unconnected_vertex
-    this->vert.push_back(start);
-    // goal is not connected to the graph and hence unconnected
-    this->unconnected_vertex.push_back(goal);
-    this->unexp_vertex.push_back(start);
-    this->x_new = this->unconnected_vertex;  
-   
-    // TODO: Read map from file
-    // Assuming map is a 2D matrix of 10 x 10 for now
+        start = start_node;
+        goal = goal_node;
+        this->map = map;
+        this->dim  = 2;
+        this->Rbit = 2.5;
+        this->no_samples = 20;
+        this->ci = std::numeric_limits<double>::infinity();
+        this->old_ci = std::numeric_limits<double>::infinity();
+        this->map_size = map.cols() * map.rows();
 
-    // For samplePHS
-    cmin = sqrt(pow(goal.x - start.x, 2) + pow(goal.y - start.y, 2));
-    center = { (start.x + goal.x) / 2, (start.y + goal.y) / 2 };
-    a1 = { (goal.x - start.x) / cmin, (goal.y - start.y) / cmin };
+        // add node  = vert. and self.V = unconnected_vertex
+        this->vert.push_back(start);
+        // goal is not connected to the graph and hence unconnected
+        this->unconnected_vertex.push_back(goal);
+        this->unexp_vertex.push_back(start);
+        this->x_new = this->unconnected_vertex;  
+    
+        // TODO: Read map from file
+        // Assuming map is a 2D matrix of 10 x 10 for now
 
-    map_width = map.rows();
-    map_height = map.cols();
-    f_hat_map = Eigen::MatrixXd::Zero(map_width, map_height);
+        // For samplePHS
+        cmin = sqrt(pow(goal.x - start.x, 2) + pow(goal.y - start.y, 2));
+        center = { (start.x + goal.x) / 2, (start.y + goal.y) / 2 };
+        a1 = { (goal.x - start.x) / cmin, (goal.y - start.y) / cmin };
 
-    // store free nodes and obstacles
-    free_nodes_map();
-    f_hat_map_data();
-    this->vertex_q.push(start);
-    get_PHS();
+        map_width = map.rows();
+        map_height = map.cols();
+        f_hat_map = Eigen::MatrixXd::Zero(map_width, map_height);
 
-   
+        std::mt19937 gen(0);
+        // store free nodes and obstacles
+        free_nodes_map();
+        f_hat_map_data();
+        this->vertex_q.push(start);
+        get_PHS();
+  
+        
     }
     
-
     // variables
     Node start;
     Node goal;
@@ -326,7 +319,8 @@ public:
     std::vector<Node> xphs;
     std::vector<Node> intersection;
 
-
+    std::random_device rd;
+    std::mt19937 gen;
 
 
 
@@ -346,7 +340,6 @@ public:
     std::pair<std::vector<Node>, double> final_solution();
     void update_children_gt(Node node);
     std::vector<Node> near(std::vector<Node> search_list, Node node);
-    void remove_node(Node *node);
     bool nodeEqual(const Node& n1, const Node& n2);
     void f_hat_map_data();
     void free_nodes_map();
@@ -355,11 +348,7 @@ public:
     void get_f_hat_map();
     
     
-
-
     // debug variables
     std::vector<Edge> debug_edges;
-
-
 
 };

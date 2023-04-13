@@ -4,7 +4,14 @@ project(BitStar)
 
 set(CMAKE_CXX_STANDARD 11)
 include_directories(include)
-# install(DIRECTORY include/${PROJECT_NAME}/
-#         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-# add_executable(BitStar bitstar.cpp)
-add_executable(BitStar unit_test2.cpp)
+
+
+find_package(OpenCV 4 REQUIRED)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+
+
+add_executable(BitStar unit_test2.cpp )
+
+target_link_libraries(BitStar ${OpenCV_LIBS})
