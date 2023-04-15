@@ -1,18 +1,15 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
-# 072427
+
 from queue import PriorityQueue
 import numpy as np
 from PIL import Image
 import random
-import matplotlib.pyplot as plt
-import cv2
 import cProfile, pstats
 import time
 from datetime import datetime
 import os
 import json
-import copy
 
 random.seed(1)
 np.random.seed(1)
@@ -64,6 +61,8 @@ class Map:
         self.dim = 2
         if image_path is None:
             self.map = np.ones(size)
+            self.map[0:30, 30:50] = 0
+            self.map[31:61, 30:50] = 0
         else:
             self.map = np.array(Image.open(image_path))
         # self.map = np.ones((5, 5))
@@ -84,7 +83,7 @@ class Map:
     def new_sample(self):
         while True:
             free_node = random.sample(self.free, 1)[0]
-            noise = np.random.uniform(-1, 1, self.dim)
+            noise = np.random.uniform(0, 1, self.dim)
             new_node = free_node + noise
             if (int(new_node[0]), int(new_node[1])) in self.free:
                 return new_node
@@ -112,6 +111,7 @@ class bitstar:
         self.m = no_samples
         self.ci = np.inf
         self.old_ci = np.inf
+        self.cmin = np.linalg.norm(self.goal.np_arr - self.start.np_arr)
         self.flat_map = self.map.map.flatten()
 
         self.V = set()
@@ -135,7 +135,7 @@ class bitstar:
         self.x_new = self.unconnected.copy()
 
         self.qv.put((start.gt + start.h_hat, self.qv_order, start))
-        self.qv_order += 1
+        self.qv_order -= 1
         self.get_PHS()
 
         self.json_save_dir = (
@@ -184,8 +184,6 @@ class bitstar:
     def expand_next_vertex(self):
         #! Potential BUG: Somewhere here or in near when we add node we must send it with gt, parent, par_cost initialized.
         vmin = self.qv.get(False)[2]
-
-                
         x_near = None
         if vmin in self.unexpanded:
             x_near = self.near(self.unconnected, vmin)
@@ -197,7 +195,7 @@ class bitstar:
             if self.a_hat(vmin, x) < self.ci:
                 cost = vmin.gt + self.c(vmin, x) + x.h_hat
                 self.qe.put((cost, self.qe_order, (vmin, x)))
-                self.qe_order += 1
+                self.qe_order -= 1
                 #! Potential BUG: Should look like this: self.qe.put((vmin.gt + self.c(vmin, x), x.h_hat), (Node(vmin), Node(x))))
 
         if vmin in self.unexpanded:
@@ -210,7 +208,7 @@ class bitstar:
                 ):
                     cost = vmin.gt + self.c(vmin, v) + v.h_hat
                     self.qe.put((cost, self.qe_order, (vmin, v)))
-                    self.qe_order += 1
+                    self.qe_order -= 1
             self.unexpanded.remove(vmin)
 
     def sample_unit_ball(self):
@@ -220,9 +218,8 @@ class bitstar:
         return r * u / norm
 
     def samplePHS(self):
-        cmin = np.linalg.norm(self.goal.np_arr - self.start.np_arr)
         center = (self.start.np_arr + self.goal.np_arr) / 2
-        a1 = (self.goal.np_arr - self.start.np_arr) / cmin
+        a1 = (self.goal.np_arr - self.start.np_arr) / self.cmin
         one_1 = np.eye(a1.shape[0])[:, 0]
         U, S, Vt = np.linalg.svd(np.outer(a1, one_1.T))
         Sigma = np.diag(S)
@@ -230,7 +227,7 @@ class bitstar:
         lam[-1, -1] = np.linalg.det(U) * np.linalg.det(Vt.T)
         cwe = np.matmul(U, np.matmul(lam, Vt))
         r1 = self.ci / 2
-        rn = [np.sqrt(self.ci**2 - cmin**2) / 2] * (self.dim - 1)
+        rn = [np.sqrt(self.ci**2 - self.cmin**2) / 2] * (self.dim - 1)
         r = np.array([r1] + rn)
 
         while True:
@@ -241,7 +238,8 @@ class bitstar:
                 if (int(op[0]), int(op[1])) in self.intersection:
                     break
             except:
-                print(op, x_ball, r, cmin, self.ci, cwe)
+                print(op, x_ball, r, self.cmin, self.ci, cwe)
+                exit()
 
         return op
 
@@ -260,7 +258,7 @@ class bitstar:
         if len(self.xphs) < len(self.flat_map):
             xrand = self.samplePHS()
         else:
-            xrand = self.map.sample()
+            xrand = self.map.new_sample()
 
         #! Potential BUG: Same issue propagates here afaik.
         return Node(xrand)
@@ -275,10 +273,10 @@ class bitstar:
                 new_unconnected.add(n)
         self.unconnected = new_unconnected
 
-        sorted_nodes = sorted(self.V, key=lambda x: x.gt)
+        sorted_nodes = sorted(self.V, key=lambda x: x.gt, reverse=True)
         for v in sorted_nodes:
             if v != self.start and v != self.goal:
-                if (v.f_hat >= self.ci) or (v.gt + v.h_hat >= self.ci):
+                if (v.f_hat > self.ci) or (v.gt + v.h_hat > self.ci):
                     self.V.discard(v)
                     self.vsol.discard(v)
                     self.unexpanded.discard(v)
@@ -287,15 +285,25 @@ class bitstar:
                     v.parent.children.remove(v)
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
+                    else:
+                        del v
         self.unconnected.add(self.goal)
 
     def remove_children(self, n):
-        connected = n.children
+        connected = list(n.children)
         if connected != []:
-            for c in connected:
+            for i in range(len(connected)):
+                c = connected[i]
+                # print("Removing", c)
                 self.remove_children(c)
-        if n in self.V:
+                c.parent = None
+                c.par_cost = np.inf
+                self.E.discard((n, c))
+                self.E_vis.discard((n.tup, c.tup))
+        if n in self.V and n != self.start and n != self.goal:
+            # print(f"Discarding {n} from V")
             self.V.remove(n)
+            self.pruned.add(n)
 
     def final_solution(self):
         if self.goal.gt == np.inf:
@@ -315,29 +323,59 @@ class bitstar:
             c.gt = c.par_cost + node.gt
             self.update_children_gt(c)
 
-    def make_plan(self):
+    def save_data(self):
+        if self.json_contents["ci"] == []:
+            self.json_contents["ci"].append(self.ci)
+            current_solution, _ = self.final_solution()
+            self.json_contents["final_path"].append(current_solution)
+
+        if self.json_contents["ci"][-1] != self.ci:
+            self.json_contents["ci"].append(self.ci)
+            current_solution, _ = self.final_solution()
+            self.json_contents["final_path"].append(current_solution)
+
+        self.json_contents["edges"].append(list(self.E_vis))
+
+    def dump_data(self, goal_num):
+        print("Dumping data...")
+        json_object = json.dumps(self.json_contents, indent=4)
+
+        # Writing to sample.json
+        with open(
+            f"{self.json_save_dir}/path{goal_num:02d}.json",
+            "w",
+        ) as outfile:
+            outfile.write(json_object)
+        self.json_contents = {
+            "edges": [],
+            "final_path": [],
+            "ci": [],
+        }
+        print("Data dumped")
+
+    def make_plan(self, save=False):
         start = time.time()
         unchanged = 0
         it = 0
         goal_num = 0
 
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
+            print("Start or Goal not in free space")
             return None, None
 
         if self.start.tup == self.goal.tup:
+            print("Start and Goal are the same")
             self.vsol.add(self.start)
             self.ci = 0
             return [self.start.tup], 0
 
         try:
-            while self.ci <= self.old_ci:
+            while True:
                 it += 1
                 if self.qe.empty() and self.qv.empty():
                     self.prune()
-                    self.json_contents["ci"].append(self.ci)
-                    self.json_contents["edges"].append(list(self.E_vis))
-                    current_solution, _ = self.final_solution()
-                    self.json_contents["final_path"].append(current_solution)
+                    if save:
+                        self.save_data()
 
                     x_sample = set()
 
@@ -348,7 +386,7 @@ class bitstar:
                     self.unconnected = self.unconnected | self.x_new
                     for n in self.V:
                         self.qv.put((n.gt + n.h_hat, self.qv_order, n))
-                        self.qv_order += 1
+                        self.qv_order -= 1
                 while True:
                     if self.qv.empty():
                         break
@@ -360,7 +398,6 @@ class bitstar:
                         break
 
                 if not (self.qe.empty()):
-                    # print(self.qe.queue)
                     (vmin, xmin) = self.qe.get(False)[2]
 
                     if vmin.gt + self.c_hat(vmin, xmin) + xmin.h_hat < self.ci:
@@ -391,48 +428,34 @@ class bitstar:
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
                                         self.E_vis.add((xmin.parent.tup, xmin.tup))
-                                        self.qv.put((xmin.gt + xmin.h_hat, self.qv_order, xmin))
-                                        self.qv_order += 1
+                                        self.qv_order -= 1
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
                                         xmin.parent.children.add(xmin)
                                         self.unconnected.remove(xmin)
-                                    self.ci = self.goal.gt
+                                    # if self.goal.gt != self.ci:
+                                    # self.old_ci = self.ci
+                                    self.ci = max(self.goal.gt, self.cmin)
 
-                                    self.json_contents["ci"].append(self.ci)
-                                    self.json_contents["edges"].append(list(self.E_vis))
-                                    current_solution, _ = self.final_solution()
-                                    self.json_contents["final_path"].append(
-                                        current_solution
-                                    )
+                                    if save:
+                                        self.save_data()
 
-                                    if xmin == self.goal:
-                                        print("\n\nGOAL FOUND")
+                                    if self.ci != self.old_ci:
+                                        print("\n\nGOAL FOUND ", goal_num)
                                         print("Time Taken:", time.time() - start)
                                         start = time.time()
                                         solution, length = self.final_solution()
+                                        print("Path:", solution)
                                         print("Path Length:", length)
-                                        print("Difference:", self.ci - length)
-                                        print(self.old_ci, self.ci)
-                                        self.old_ci = self.ci
-
-                                        json_object = json.dumps(
-                                            self.json_contents, indent=4
+                                        print(
+                                            f"Old CI: {self.old_ci}, New CI: {self.ci}, ci - cmin: {round(self.ci - self.cmin, 5)}, Difference in CI: {round(self.old_ci - self.ci, 5)}"
                                         )
-
-                                        # Writing to sample.json
-                                        with open(
-                                            f"{self.json_save_dir}/path{goal_num:02d}.json",
-                                            "w",
-                                        ) as outfile:
-                                            outfile.write(json_object)
+                                        self.old_ci = self.ci
+                                        if save:
+                                            print("Dump")
+                                            self.dump_data(goal_num)
                                         goal_num += 1
-                                        self.json_contents = {
-                                            "edges": [],
-                                            "final_path": [],
-                                            "ci": [],
-                                        }
 
                     else:
                         self.qe = PriorityQueue()
@@ -443,6 +466,7 @@ class bitstar:
                     self.qe = PriorityQueue()
                     self.qv = PriorityQueue()
                     unchanged += 1
+            return self.final_solution()
         except KeyboardInterrupt:
             print(time.time() - start)
             print(self.final_solution())
@@ -454,24 +478,19 @@ if __name__ == "__main__":
     profiler.enable()
 
     start_arr = np.array([0, 0])
-    goal_arr = np.array([99, 99])
+    goal_arr = np.array([0, 99])
 
     start = Node((0, 0), gt=0)
-    goal = Node((99, 99))
-
-    # start_arr = np.array([0, 0])
-    # goal_arr = np.array([4, 4])
-
-    # start = Node((0, 0), gt=0)
-    # goal = Node((4, 4))
+    goal = Node((0, 99))
 
     map_path = (
         f"{os.path.abspath(os.path.dirname(__file__))}/../gridmaps/occupancy_map.png"
     )
 
     map_obj = Map(start=start, goal=goal, size=(100, 100))
-    planner = bitstar(start=start, goal=goal, occ_map=map_obj, no_samples=10, rbit=5)
-    path, path_length = planner.make_plan()
+    planner = bitstar(start=start, goal=goal, occ_map=map_obj, no_samples=100, rbit=10)
+    path, path_length = planner.make_plan(save=True)
+    print(planner.ci, planner.old_ci)
     print(path, path_length)
 
     profiler.disable()
