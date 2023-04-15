@@ -484,34 +484,24 @@ double Bit_star::c(Node node1, Node node2)
     double x2 = node2.x;
     double y2 = node2.y;
     std::cout << "x1, y1: " << x1 << "," << y1 << " x2, y2: " << x2 <<","<< y2 << std::endl;
-    // std::cout << sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2)) << std::endl;
+    std::cout << sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2)) << std::endl;
     int n_divs = int(10 * sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2)));
     std::cout << "n_divs: " << n_divs << std::endl;
     if(n_divs == 0){
         return c_hat(&node1, &node2);
     }
-    for (double lam = 0; lam <= 1; lam += 1.0/n_divs){
+    for (double lam = 0; lam <= 1; lam += n_divs){
 
         // std::cout << "lam: " << lam << std::endl;
         int x = int(x1 + lam * (x2 - x1));
         int y = int(y1 + lam * (y2 - y1));
-    
-        std::cout << "x, y: " << x << "," << y << std::endl;
-
-        if((x==1 && y==1) || (x==1 && y==2) || (x == 3 && y == 1) || (x == 3 && y == 2)){
-            std::cout << " OBSTACLE!!!!" << std::endl;
-            std::cout << "x1, y1: " << x1 << "," << y1 << " x2, y2: " << x2 <<","<< y2 << std::endl;
-
-        }
-
-
         for(auto node : this->occupied){
             if(node.x == x && node.y == y){
-                std::cout << "x1, y1: " << x1 << "," << y1 << " x2, y2: " << x2 <<","<< y2 << std::endl;
-
                 return std::numeric_limits<double>::infinity();
             }
         }
+    
+
     }
     return c_hat(&node1, &node2); 
 }
@@ -527,9 +517,6 @@ double Bit_star::gt(Node node)
     {
         return std::numeric_limits<double>::infinity();
     }
-
-
-
     return node.parent_cost + node.parent[0].gt;
 
 }
@@ -542,13 +529,14 @@ bool Bit_star::nodeEqual(const Node& n1, const Node& n2) {
 
 }
 
+
 // TODO: check main function properly
 int main()
 {
     
-    Node* start = new Node(0.0, 0.0, 0.0, 0.0);
+    Node* start = new Node(635.0, 140.0, 0.0, 0.0);
 
-    Node* goal = new Node(99.0, 99.0, start, true);
+    Node* goal = new Node(350.0, 400.0, start, true);
     start->h_hat = sqrt(pow(start->x - goal->x, 2) + pow(start->y -goal->y, 2));
 
     // print goal's g_hat, h_hat and f_hat
@@ -556,26 +544,23 @@ int main()
     // std::cout << "goal's h_hat: " << goal->h_hat << std::endl;
     // std::cout << "goal's f_hat: " << goal->f_hat << std::endl;
 
-    Eigen::MatrixXd map = Eigen::MatrixXd::Ones(100, 100);
-    // map(3,3) = 0;
-    // // map(4,4) = 0;
-    // // map(4,2) = 0;
-    // map(4,3) = 0;
+    // Eigen::MatrixXd map = Eigen::MatrixXd::Ones(10, 10);
 
-    // map(2,1) = 0;
-    // map(2,2) = 0;
-    // map(1,2) = 0;
+    // use opencv and read map from image
+    cv::Mat map = cv::imread("/home/marley/NEU_Courses/mobile_robotics/final_project/BIT-Star/gridmaps/occupancy_map.png", cv::IMREAD_GRAYSCALE);
 
-    for(int i = 20; i < 60; i++){
-        for(int j = 40; j < 80; j++){
-            map(i,j) = 0;
+    // convert map to Eigen::MatrixXd
+    Eigen::MatrixXd map_eigen = Eigen::MatrixXd::Zero(map.rows, map.cols);
+    for (int i = 0; i < map.rows; i++)
+    {
+        for (int j = 0; j < map.cols; j++)
+        {
+            map_eigen(i, j) = map.at<uchar>(i, j);
         }
-        // std::cout << std::endl;
     }
 
-    // std::Cout << map << std::endl;
 
-    Bit_star *tree = new Bit_star(*start, *goal, map);
+    Bit_star *tree = new Bit_star(*start, *goal, map_eigen);
     
     int iteration = 0;
     std::cout << "start" << std::endl;
