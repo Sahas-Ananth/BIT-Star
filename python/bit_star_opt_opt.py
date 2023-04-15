@@ -11,8 +11,8 @@ from datetime import datetime
 import os
 import json
 
-random.seed(1)
-np.random.seed(1)
+# random.seed(1)
+# np.random.seed(1)
 
 global start_arr
 global goal_arr
@@ -54,17 +54,19 @@ class Node:
 
 
 class Map:
-    def __init__(self, start, goal, image_path=None, size=(5, 5)):
+    def __init__(self, start, goal, occ_grid=None):
         self.start = start
         self.goal = goal
         self.obstacles = set()
         self.dim = 2
-        if image_path is None:
-            self.map = np.ones(size)
-            self.map[0:30, 30:50] = 0
-            self.map[31:61, 30:50] = 0
-        else:
-            self.map = np.array(Image.open(image_path))
+        # if image_path is None:
+        #     self.map = np.ones(size)
+        #     self.map[0:30, 30:50] = 0
+        #     self.map[31:61, 30:50] = 0
+        # else:
+        #     self.map = np.array(Image.open(image_path))
+
+        self.map = occ_grid
         # self.map = np.ones((5, 5))
         ind = np.argwhere(self.map > 0)
         self.free = set(list(map(lambda x: tuple(x), ind)))
@@ -102,7 +104,7 @@ class Map:
 
 
 class bitstar:
-    def __init__(self, start, goal, occ_map, no_samples=20, rbit=100, dim=2):
+    def __init__(self, start, goal, occ_map, no_samples=20, rbit=100, dim=2, log_dir = None):
         self.start = start
         self.goal = goal
         self.map = occ_map
@@ -138,13 +140,14 @@ class bitstar:
         self.qv_order -= 1
         self.get_PHS()
 
-        self.json_save_dir = (
-            f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/"
-            + str(datetime.now())
-            + "/"
-        )
-        print(self.json_save_dir)
-        os.makedirs(self.json_save_dir, exist_ok=True)
+        if log_dir is None:
+            self.log_dir = (
+                f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/"
+                + str(datetime.now())
+                + "/"
+            )
+        print(self.log_dir)
+        os.makedirs(self.log_dir, exist_ok=True)
         self.json_contents = {"edges": [], "final_path": [], "ci": []}
 
     def gt(self, node):
@@ -342,7 +345,7 @@ class bitstar:
 
         # Writing to sample.json
         with open(
-            f"{self.json_save_dir}/path{goal_num:02d}.json",
+            f"{self.log_dir}/path{goal_num:02d}.json",
             "w",
         ) as outfile:
             outfile.write(json_object)
@@ -473,26 +476,26 @@ class bitstar:
             return self.final_solution()
 
 
-if __name__ == "__main__":
-    profiler = cProfile.Profile()
-    profiler.enable()
+# if __name__ == "__main__":
+#     profiler = cProfile.Profile()
+#     profiler.enable()
 
-    start_arr = np.array([0, 0])
-    goal_arr = np.array([0, 99])
+#     start_arr = np.array([0, 0])
+#     goal_arr = np.array([0, 99])
 
-    start = Node((0, 0), gt=0)
-    goal = Node((0, 99))
+#     start = Node((0, 0), gt=0)
+#     goal = Node((0, 99))
 
-    map_path = (
-        f"{os.path.abspath(os.path.dirname(__file__))}/../gridmaps/occupancy_map.png"
-    )
+#     map_path = (
+#         f"{os.path.abspath(os.path.dirname(__file__))}/../gridmaps/occupancy_map.png"
+#     )
 
-    map_obj = Map(start=start, goal=goal, size=(100, 100))
-    planner = bitstar(start=start, goal=goal, occ_map=map_obj, no_samples=100, rbit=10)
-    path, path_length = planner.make_plan(save=True)
-    print(planner.ci, planner.old_ci)
-    print(path, path_length)
+#     map_obj = Map(start=start, goal=goal, size=(100, 100))
+#     planner = bitstar(start=start, goal=goal, occ_map=map_obj, no_samples=100, rbit=10)
+#     path, path_length = planner.make_plan(save=True)
+#     print(planner.ci, planner.old_ci)
+#     print(path, path_length)
 
-    profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats("cumtime")
-    stats.print_stats()
+#     profiler.disable()
+#     stats = pstats.Stats(profiler).sort_stats("cumtime")
+#     stats.print_stats()
