@@ -5,7 +5,7 @@ from vis3 import *
 import sys
 
 
-def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
+def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
     pwd = os.path.abspath(os.path.dirname(__file__))
 
     random.seed(seed)
@@ -73,7 +73,7 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
         visualizer.read_json(log_dir, max_iter=np.inf)
 
         for i in range(len(os.listdir(log_dir))):
-            visualizer.draw_tree(start, goal, i)
+            visualizer.draw(start, goal, i, fast)
         plt.show()
 
 
@@ -115,6 +115,11 @@ def parse_opt():
         type=int,
         default=60,
         help="When to stop the algorithm. Eg: --stop_time 60",
+    )
+    parser.add_argument(
+        '--fast',
+        action='store_true',
+        help="Whether or not to only plot the final edge list of each iteration."
     )
 
     opt = parser.parse_args()

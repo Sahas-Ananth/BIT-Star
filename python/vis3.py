@@ -27,6 +27,8 @@ class Visualizer():
 
         self.fig, self.ax = plt.subplots(figsize=(20, 20))
 
+        self.all_final_edge_list = []
+
 
     def read_json(self, folder, max_iter=np.inf):
         files = sorted(os.listdir(folder))
@@ -40,6 +42,7 @@ class Visualizer():
                 self.all_rem_edges.append(data['rem_edges'])
                 self.all_final_paths.append(data['final_path'])
                 self.all_cis.append(np.array(data['ci']))
+                self.all_final_edge_list.append(data['final_edge_list'])
 
                 print(f"Loaded {i+1}/{max_iter}", end="\r")
 
@@ -54,7 +57,7 @@ class Visualizer():
             y,
             x,
             color="green",
-            lw=3,
+            lw=4,
             marker="x",
             markersize=4,
             markerfacecolor="blue",
@@ -139,15 +142,44 @@ class Visualizer():
             else:
                 self.final_path = path
                 self.draw_final_path(fig, ax, path)
-                
-
             
-            # print(f"Drawing CI {sim} - {ci}")
+            # print(f"Drawing CI {sim} - {ci}") 
             self.draw_ellipse(fig, ax, ci, start, goal, colour="b")
             ax.plot(start[0], start[1], "go", markersize=30)
             ax.plot(goal[0], goal[1], "ro", markersize=30)
+
+
             plt.show(block=False)
             plt.pause(0.0001)
+
+
+    def draw_fast(self, start, goal, sim):
+        fig, ax = self.fig, self.ax
+        self.edges = self.all_final_edge_list[sim]
+        path = self.all_final_paths[sim][-1]
+        ci = self.all_cis[sim][0]
+
+        self.redraw_map(start, goal, self.occ_map, sim, fig, ax)
+
+        if path is not None:
+            self.final_path = path
+            self.draw_final_path(fig, ax, path)
+
+        self.draw_ellipse(fig, ax, ci, start, goal, colour="b")
+        ax.plot(start[0], start[1], "go", markersize=30)
+        ax.plot(goal[0], goal[1], "ro", markersize=30)
+
+        plt.show(block=False)
+        plt.pause(1)
+
+
+    def draw(self, start, goal, sim, fast):
+        if fast:
+            self.draw_fast(start, goal, sim)
+        else:
+            self.draw_tree(start, goal, sim)
+
+
 
     def redraw_map(self, start, goal, occ_map, sim, fig, ax):
         ax.cla()
@@ -167,8 +199,8 @@ class Visualizer():
 
 
 if __name__ == '__main__':
-    log_dir = '../Logs/Maze.png/'
-    occ_map = np.array(Image.open('../gridmaps/Maze.png'))
+    log_dir = '../Logs/Default.png/'
+    occ_map = np.array(Image.open('../gridmaps/Default.png'))
     start = np.array([0, 0])
     goal = np.array([99, 99])
 
@@ -180,5 +212,5 @@ if __name__ == '__main__':
     visualizer.read_json(log_dir, max_iter=np.inf)
 
     for i in range(len(os.listdir(log_dir))):
-        visualizer.draw_tree(start, goal, i)
+        visualizer.draw(start, goal, i, True)
     

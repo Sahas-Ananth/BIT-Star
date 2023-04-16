@@ -157,7 +157,7 @@ class bitstar:
         if log_dir is not None:
             self.save = True
             self.log_dir = log_dir
-            self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": []}
+            self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": [], "final_edge_list": []}
 
     def gt(self, node):
         if node == self.start:
@@ -356,6 +356,8 @@ class bitstar:
 
     def dump_data(self, goal_num):
         print("Dumping data...")
+        self.json_contents['final_edge_list'] = list(self.E_vis)
+        print(list(self.json_contents.keys()))
         json_object = json.dumps(self.json_contents, indent=4)
 
         # Writing to sample.json
@@ -365,7 +367,7 @@ class bitstar:
         ) as outfile:
             outfile.write(json_object)
 
-        self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": []}
+        self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": [], "final_edge_list": []}
         print("Data dumped")
 
     def make_plan(self):
