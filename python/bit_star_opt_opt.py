@@ -104,7 +104,17 @@ class Map:
 
 
 class bitstar:
-    def __init__(self, start, goal, occ_map, no_samples=20, rbit=100, dim=2, log_dir = None):
+    def __init__(
+        self,
+        start,
+        goal,
+        occ_map,
+        no_samples=20,
+        rbit=100,
+        dim=2,
+        log_dir=None,
+        stop_time=60,
+    ):
         self.start = start
         self.goal = goal
         self.map = occ_map
@@ -115,6 +125,8 @@ class bitstar:
         self.old_ci = np.inf
         self.cmin = np.linalg.norm(self.goal.np_arr - self.start.np_arr)
         self.flat_map = self.map.map.flatten()
+        self.stop_time = stop_time
+        print("Stop time: ", self.stop_time)
 
         self.V = set()
         self.E = set()
@@ -140,15 +152,12 @@ class bitstar:
         self.qv_order -= 1
         self.get_PHS()
 
-        if log_dir is None:
-            self.log_dir = (
-                f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/"
-                + str(datetime.now())
-                + "/"
-            )
-        print(self.log_dir)
-        os.makedirs(self.log_dir, exist_ok=True)
-        self.json_contents = {"edges": [], "final_path": [], "ci": []}
+        self.save = False
+
+        if log_dir is not None:
+            self.save = True
+            self.log_dir = log_dir
+            self.json_contents = {"edges": [], "final_path": [], "ci": []}
 
     def gt(self, node):
         if node == self.start:
@@ -356,12 +365,7 @@ class bitstar:
         }
         print("Data dumped")
 
-    def make_plan(self, save=False):
-        start = time.time()
-        unchanged = 0
-        it = 0
-        goal_num = 0
-
+    def make_plan(self):
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
             print("Start or Goal not in free space")
             return None, None
@@ -372,12 +376,21 @@ class bitstar:
             self.ci = 0
             return [self.start.tup], 0
 
+        it = 0
+        goal_num = 0
+        plan_time = time.time()
+        start = time.time()
+
         try:
             while True:
+                if time.time() - plan_time >= self.stop_time:
+                    print("Stopping due to time limit")
+                    return self.final_solution()
+
                 it += 1
                 if self.qe.empty() and self.qv.empty():
                     self.prune()
-                    if save:
+                    if self.save:
                         self.save_data()
 
                     x_sample = set()
@@ -441,10 +454,14 @@ class bitstar:
                                     # self.old_ci = self.ci
                                     self.ci = max(self.goal.gt, self.cmin)
 
-                                    if save:
+                                    if self.save:
                                         self.save_data()
 
                                     if self.ci != self.old_ci:
+                                        if time.time() - plan_time >= self.stop_time:
+                                            print("Stopping due to time limit")
+                                            return self.final_solution()
+
                                         print("\n\nGOAL FOUND ", goal_num)
                                         print("Time Taken:", time.time() - start)
                                         start = time.time()
@@ -455,7 +472,7 @@ class bitstar:
                                             f"Old CI: {self.old_ci}, New CI: {self.ci}, ci - cmin: {round(self.ci - self.cmin, 5)}, Difference in CI: {round(self.old_ci - self.ci, 5)}"
                                         )
                                         self.old_ci = self.ci
-                                        if save:
+                                        if self.save:
                                             print("Dump")
                                             self.dump_data(goal_num)
                                         goal_num += 1
@@ -463,13 +480,10 @@ class bitstar:
                     else:
                         self.qe = PriorityQueue()
                         self.qv = PriorityQueue()
-                        unchanged += 1
 
                 else:
                     self.qe = PriorityQueue()
                     self.qv = PriorityQueue()
-                    unchanged += 1
-            return self.final_solution()
         except KeyboardInterrupt:
             print(time.time() - start)
             print(self.final_solution())
