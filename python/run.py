@@ -1,7 +1,7 @@
 import argparse
-from bit_star_opt_opt import *
-import bit_star_opt_opt
-from vis2 import *
+from bit_star_vis import *
+import bit_star_vis
+from vis3 import *
 import sys
 
 
@@ -27,8 +27,8 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
     map_path = f"{pwd}/../gridmaps/{map_name}"
     occ_map = np.array(Image.open(map_path))
 
-    bit_star_opt_opt.start_arr = start
-    bit_star_opt_opt.goal_arr = goal
+    bit_star_vis.start_arr = start
+    bit_star_vis.goal_arr = goal
 
     start_node = Node(tuple(start), gt=0)
     goal_node = Node(tuple(goal))
@@ -65,10 +65,15 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
         output_dir = f"{pwd}/../Output/PyViz/{map_name} - {str(datetime.now())}/"
         os.makedirs(output_dir, exist_ok=True)
 
-        print(log_dir, os.listdir(log_dir))
-        sim_edges, sim_costs, sim_paths = read_json(log_dir, max_iter=np.inf)
         inv_map = np.where((occ_map==0)|(occ_map==1), occ_map^1, occ_map)
-        draw_tree(sim_edges, sim_costs, sim_paths, start, goal, inv_map)
+
+        visualizer = Visualizer(start, goal, inv_map)
+
+        print(log_dir, os.listdir(log_dir))
+        visualizer.read_json(log_dir, max_iter=np.inf)
+
+        for i in range(len(os.listdir(log_dir))):
+            visualizer.draw_tree(start, goal, i)
         plt.show()
 
 
