@@ -472,6 +472,7 @@ class bitstar:
                                             f"Old CI: {self.old_ci}, New CI: {self.ci}, ci - cmin: {round(self.ci - self.cmin, 5)}, Difference in CI: {round(self.old_ci - self.ci, 5)}"
                                         )
                                         self.old_ci = self.ci
+
                                         if self.save:
                                             print("Dump")
                                             self.dump_data(goal_num)

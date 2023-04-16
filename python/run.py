@@ -14,15 +14,15 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
     start = []
     goal = []
     for i in range(opt.dim):
-        start.append(int(opt.start[i]))
-        goal.append(int(opt.goal[i]))
+        start.append(float(opt.start[i]))
+        goal.append(float(opt.goal[i]))
     start = np.array(start)
     goal = np.array(goal)
 
     log_dir = f"{pwd}/../Logs/{map_name}"
-    output_dir = f"{pwd}/../Output/PyViz/{map_name} - {str(datetime.now())}/"
+    
     os.makedirs(log_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
+   
 
     map_path = f"{pwd}/../gridmaps/{map_name}"
     occ_map = np.array(Image.open(map_path))
@@ -60,6 +60,16 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time):
 
     print(planner.ci, planner.old_ci)
     print(path, path_length)
+
+    if vis:
+        output_dir = f"{pwd}/../Output/PyViz/{map_name} - {str(datetime.now())}/"
+        os.makedirs(output_dir, exist_ok=True)
+
+        print(log_dir, os.listdir(log_dir))
+        sim_edges, sim_costs, sim_paths = read_json(log_dir, max_iter=np.inf)
+        inv_map = np.where((occ_map==0)|(occ_map==1), occ_map^1, occ_map)
+        draw_tree(sim_edges, sim_costs, sim_paths, start, goal, inv_map)
+        plt.show()
 
 
 def parse_opt():
