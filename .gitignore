@@ -1,3 +1,5 @@
 Rapidly-Exploring-Random-Trees/
 .vscode/
 Logs/
+*.pyc
+python/__pycache__/

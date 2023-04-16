@@ -149,7 +149,7 @@ class bitstar:
         self.x_new = self.unconnected.copy()
 
         self.qv.put((start.gt + start.h_hat, self.qv_order, start))
-        self.qv_order -= 1
+        self.qv_order += 1
         self.get_PHS()
 
         self.save = False
@@ -157,7 +157,7 @@ class bitstar:
         if log_dir is not None:
             self.save = True
             self.log_dir = log_dir
-            self.json_contents = {"edges": [], "final_path": [], "ci": []}
+            self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": []}
 
     def gt(self, node):
         if node == self.start:
@@ -207,7 +207,7 @@ class bitstar:
             if self.a_hat(vmin, x) < self.ci:
                 cost = vmin.gt + self.c(vmin, x) + x.h_hat
                 self.qe.put((cost, self.qe_order, (vmin, x)))
-                self.qe_order -= 1
+                self.qe_order += 1
                 #! Potential BUG: Should look like this: self.qe.put((vmin.gt + self.c(vmin, x), x.h_hat), (Node(vmin), Node(x))))
 
         if vmin in self.unexpanded:
@@ -220,7 +220,7 @@ class bitstar:
                 ):
                     cost = vmin.gt + self.c(vmin, v) + v.h_hat
                     self.qe.put((cost, self.qe_order, (vmin, v)))
-                    self.qe_order -= 1
+                    self.qe_order += 1
             self.unexpanded.remove(vmin)
 
     def sample_unit_ball(self):
@@ -285,6 +285,8 @@ class bitstar:
                 new_unconnected.add(n)
         self.unconnected = new_unconnected
 
+        rem_edge = []
+
         sorted_nodes = sorted(self.V, key=lambda x: x.gt, reverse=True)
         for v in sorted_nodes:
             if v != self.start and v != self.goal:
@@ -294,11 +296,16 @@ class bitstar:
                     self.unexpanded.discard(v)
                     self.E.discard((v.parent, v))
                     self.E_vis.discard((v.parent.tup, v.tup))
+                    if self.save:
+                        rem_edge.append((v.parent.tup, v.tup))
                     v.parent.children.remove(v)
                     if v.f_hat < self.ci:
                         self.x_reuse.add(v)
                     else:
                         del v
+
+        if self.save:
+            self.save_data(None, rem_edge)
         self.unconnected.add(self.goal)
 
     def remove_children(self, n):
@@ -335,18 +342,17 @@ class bitstar:
             c.gt = c.par_cost + node.gt
             self.update_children_gt(c)
 
-    def save_data(self):
-        if self.json_contents["ci"] == []:
-            self.json_contents["ci"].append(self.ci)
+    def save_data(self, new_edge, rem_edge, new_final = False):
+        self.json_contents["ci"].append(self.ci)
+        self.json_contents['new_edges'].append(new_edge)
+        self.json_contents['rem_edges'].append(rem_edge)
+
+        if new_final:
             current_solution, _ = self.final_solution()
             self.json_contents["final_path"].append(current_solution)
+        else:
+            self.json_contents['final_path'].append(None)
 
-        if self.json_contents["ci"][-1] != self.ci:
-            self.json_contents["ci"].append(self.ci)
-            current_solution, _ = self.final_solution()
-            self.json_contents["final_path"].append(current_solution)
-
-        self.json_contents["edges"].append(list(self.E_vis))
 
     def dump_data(self, goal_num):
         print("Dumping data...")
@@ -358,11 +364,8 @@ class bitstar:
             "w",
         ) as outfile:
             outfile.write(json_object)
-        self.json_contents = {
-            "edges": [],
-            "final_path": [],
-            "ci": [],
-        }
+
+        self.json_contents = {"new_edges": [], "rem_edges": [], "final_path": [], "ci": []}
         print("Data dumped")
 
     def make_plan(self):
@@ -390,8 +393,6 @@ class bitstar:
                 it += 1
                 if self.qe.empty() and self.qv.empty():
                     self.prune()
-                    if self.save:
-                        self.save_data()
 
                     x_sample = set()
 
@@ -402,7 +403,7 @@ class bitstar:
                     self.unconnected = self.unconnected | self.x_new
                     for n in self.V:
                         self.qv.put((n.gt + n.h_hat, self.qv_order, n))
-                        self.qv_order -= 1
+                        self.qv_order += 1
                 while True:
                     if self.qv.empty():
                         break
@@ -421,12 +422,15 @@ class bitstar:
                             cedge = self.c(vmin, xmin)
                             if vmin.gt + cedge + xmin.h_hat < self.ci:
                                 if vmin.gt + cedge < xmin.gt:
+                                    rem_edge = []
                                     if xmin in self.V:
                                         # tree.remove_edge(tree.parent(xmin), xmin)
                                         # tree.add_edge(vmin, xmin, weight=cedge)
                                         self.E.remove((xmin.parent, xmin))
                                         self.E_vis.remove((xmin.parent.tup, xmin.tup))
                                         xmin.parent.children.remove(xmin)
+
+                                        rem_edge.append((xmin.parent.tup, xmin.tup))
 
                                         xmin.parent = vmin
                                         xmin.par_cost = cedge
@@ -444,18 +448,20 @@ class bitstar:
                                         xmin.gt = self.gt(xmin)
                                         self.E.add((xmin.parent, xmin))
                                         self.E_vis.add((xmin.parent.tup, xmin.tup))
-                                        self.qv_order -= 1
+                                        self.qv_order += 1
                                         self.unexpanded.add(xmin)
                                         if xmin == self.goal:
                                             self.vsol.add(xmin)
                                         xmin.parent.children.add(xmin)
                                         self.unconnected.remove(xmin)
+
+                                    new_edge = ((xmin.parent.tup, xmin.tup))
                                     # if self.goal.gt != self.ci:
                                     # self.old_ci = self.ci
                                     self.ci = max(self.goal.gt, self.cmin)
 
                                     if self.save:
-                                        self.save_data()
+                                        self.save_data(new_edge, rem_edge, self.ci!=self.old_ci)
 
                                     if self.ci != self.old_ci:
                                         if time.time() - plan_time >= self.stop_time:

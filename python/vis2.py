@@ -11,14 +11,14 @@ import time
 
 def read_json(folder, max_iter=np.inf):
     all_edges, all_cis, all_paths = [], [], []
-    fold_path = f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/{folder}/"
+    # fold_path = f"{os.path.abspath(os.path.dirname(__file__))}/../Logs/PyViz/{folder}/"
 
-    files = sorted(os.listdir(fold_path))
+    files = sorted(os.listdir(folder))
     print(f"Found {len(files)} files")
     max_iter = min(max_iter, len(files))
     for i in range(max_iter):
         edges, cis, paths = [], [], []
-        with open(fold_path + files[i], "r") as f:
+        with open(os.path.join(folder, files[i]), "r") as f:
             data = json.load(f)
             for edge in data["edges"]:
                 if len(edge) == 0:
@@ -105,68 +105,49 @@ def draw_edges(fig, ax, edges):
     print(f"Draw edges: {time.time() - s_time}")
 
 
-def draw_tree(sim_edges, sim_costs, sim_path, start, goal):
+def draw_tree(sim_edges, sim_costs, sim_path, start, goal, occ_map):
     for sim in range(len(sim_edges)):
         fig, ax = plt.subplots(figsize=(20, 20))
 
-        ax.add_patch(
-            plt.Rectangle(
-                (30, 0),
-                20,
-                30,
-                fill=True,
-                color="black",
-                linewidth=2,
-            )
-        )
-
-        ax.add_patch(
-            plt.Rectangle(
-                (30, 31),
-                20,
-                30,
-                fill=True,
-                color="black",
-                linewidth=2,
-            )
-        )
+        im = ax.imshow(occ_map, cmap=plt.cm.gray)
 
         edges = sim_edges[sim]
-        draw_final_path(fig, ax, sim_path[sim][-1])
+        
         print(f"Drawing Simulation {sim}")
         draw_edges(fig, ax, edges[-1])
+        draw_final_path(fig, ax, sim_path[sim][-1])
         print(f"Drawing CI {sim} - {sim_costs[sim]}")
         draw_ellipse(fig, ax, max(sim_costs[sim]), start, goal, colour="b")
         # draw_ellipse(fig, ax, min(sim_costs[sim]), start, goal, colour="k")
-        ax.plot(start[0], start[1], "go", markersize=10)
-        ax.plot(goal[0], goal[1], "ro", markersize=10)
+        ax.plot(start[0], start[1], "go", markersize=30)
+        ax.plot(goal[0], goal[1], "ro", markersize=30)
         ax.set_title(f"BIT* - Simulation {sim}")
-        ax.set_xlim(0, 100)
-        ax.set_ylim(0, 100)
+        ax.set_xlim(-10, 110)
+        ax.set_ylim(-10, 110)
         plt.show()
 
 
-def main():
-    folder = "2023-04-14 20:20:25.757163"
-    sim_edges, sim_costs, sim_paths = read_json(folder, max_iter=np.inf)
+# def main():
+#     folder = "2023-04-14 20:20:25.757163"
+#     sim_edges, sim_costs, sim_paths = read_json(folder, max_iter=np.inf)
 
-    start = np.array([0, 0])
-    goal = np.array([99, 0])
-    # self.map = np.ones(size)
-    # unique_sim_costs = sorted(np.unique(np.concatenate(sim_costs)), reverse=True)
-    # unique_sim_paths = []
-    # for paths in sim_path:
-    #     unique_sim_paths.append(np.unique(paths, axis=1))
+#     start = np.array([0, 0])
+#     goal = np.array([99, 0])
+#     # self.map = np.ones(size)
+#     # unique_sim_costs = sorted(np.unique(np.concatenate(sim_costs)), reverse=True)
+#     # unique_sim_paths = []
+#     # for paths in sim_path:
+#     #     unique_sim_paths.append(np.unique(paths, axis=1))
 
-    # print(unique_sim_paths)
-    # exit()
-    # print(type(unique_sim_paths[0]))
-    # print(sim_costs)
-    # print(sim_paths)
-    # exit()
-    draw_tree(sim_edges, sim_costs, sim_paths, start, goal)
-    plt.show()
+#     # print(unique_sim_paths)
+#     # exit()
+#     # print(type(unique_sim_paths[0]))
+#     # print(sim_costs)
+#     # print(sim_paths)
+#     # exit()
+#     draw_tree(sim_edges, sim_costs, sim_paths, start, goal)
+#     plt.show()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
