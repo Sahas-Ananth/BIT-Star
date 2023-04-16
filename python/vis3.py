@@ -20,6 +20,8 @@ class Visualizer():
 
         self.sim = 0
         self.occ_map = cv2.cvtColor(occ_map, cv2.COLOR_BGR2RGB)
+        self.start = start
+        self.goal = goal
 
 
         self.all_new_edges, self.all_rem_edges, self.all_final_paths, self.all_cis = [], [], [], []
@@ -48,12 +50,12 @@ class Visualizer():
 
 
 
-    def draw_final_path(self, fig, ax, path):
+    def draw_final_path(self, path):
         if len(path) == 0:
             return
         path = np.array(path)
         x, y = path[:, 0], path[:, 1]
-        ax.plot(
+        self.ax.plot(
             y,
             x,
             color="green",
@@ -64,7 +66,7 @@ class Visualizer():
             markeredgecolor="blue",
         )
         for i in range(len(path) - 1):
-            ax.text(
+            self.ax.text(
                 y[i],
                 x[i] + 0.5,
                 f"({y[i]:.5f}, {x[i]:.5f})",
@@ -75,24 +77,24 @@ class Visualizer():
             )
 
 
-    def draw_ellipse(self, fig, ax, ci, start, goal, colour="b"):
+    def draw_ellipse(self, ci, colour="b"):
         if ci == np.inf:
             return
-        cmin = np.linalg.norm(goal - start)
-        center = (start + goal) / 2.0
+        cmin = np.linalg.norm(self.goal - self.start)
+        center = (self.start + self.goal) / 2.0
         r1 = ci
         r2 = np.sqrt(ci**2 - cmin**2)
-        theta = np.arctan2(goal[1] - start[1], goal[0] - start[0])
+        theta = np.arctan2(self.goal[0] - self.start[0], self.goal[1] - self.start[1])
         theta = np.degrees(theta)
-        patch = Ellipse(center, r1, r2, theta, color=colour, fill=False, lw=5, ls="--")
-        ax.add_patch(patch)
+        patch = Ellipse((center[1], center[0]), r1, r2, theta, color=colour, fill=False, lw=5, ls="--")
+        self.ax.add_patch(patch)
 
 
-    def draw_edge(self, fig, ax, edge):
+    def draw_edge(self, edge):
         edge_tup = tuple(map(tuple, edge))
 
         
-        l = ax.plot(
+        l = self.ax.plot(
             [edge[0][1], edge[1][1]],
             [edge[0][0], edge[1][0]],
             color="red",
@@ -104,10 +106,12 @@ class Visualizer():
         )
         self.lines[edge_tup] = l
 
-    def draw_tree(self, start, goal, sim):
+    def draw_tree(self, sim):
         fig = self.fig
         ax = self.ax
-        self.redraw_map(start, goal, self.occ_map, sim, fig, ax)
+        start = self.start
+        goal = self.goal
+        self.redraw_map(sim)
         
         print(f"Drawing Simulation {sim}")
         print(len(self.all_new_edges[sim]))
@@ -138,69 +142,66 @@ class Visualizer():
 
             if path is None:
                 if self.final_path is not None:
-                    self.draw_final_path(fig, ax, self.final_path)
+                    self.draw_final_path(self.final_path)
             else:
                 self.final_path = path
-                self.draw_final_path(fig, ax, path)
+                self.draw_final_path(path)
             
             # print(f"Drawing CI {sim} - {ci}") 
             self.draw_ellipse(fig, ax, ci, start, goal, colour="b")
-            ax.plot(start[0], start[1], "go", markersize=30)
-            ax.plot(goal[0], goal[1], "ro", markersize=30)
+            ax.plot(start[1], start[0], "go", markersize=30)
+            ax.plot(goal[1], goal[0], "ro", markersize=30)
 
 
             plt.show(block=False)
             plt.pause(0.0001)
 
 
-    def draw_fast(self, start, goal, sim):
+    def draw_fast(self, sim):
+        start = self.start
+        goal = self.goal
         fig, ax = self.fig, self.ax
         self.edges = self.all_final_edge_list[sim]
         path = self.all_final_paths[sim][-1]
         ci = self.all_cis[sim][0]
 
-        self.redraw_map(start, goal, self.occ_map, sim, fig, ax)
+        self.redraw_map(sim)
 
         if path is not None:
             self.final_path = path
-            self.draw_final_path(fig, ax, path)
+            self.draw_final_path(path)
 
-        self.draw_ellipse(fig, ax, ci, start, goal, colour="b")
-        ax.plot(start[0], start[1], "go", markersize=30)
-        ax.plot(goal[0], goal[1], "ro", markersize=30)
+        self.draw_ellipse(ci, colour="b")
 
         plt.show(block=False)
         plt.pause(1)
 
 
-    def draw(self, start, goal, sim, fast):
+    def draw(self, sim, fast):
         if fast:
-            self.draw_fast(start, goal, sim)
+            self.draw_fast(sim)
         else:
-            self.draw_tree(start, goal, sim)
+            self.draw_tree(sim)
 
 
 
-    def redraw_map(self, start, goal, occ_map, sim, fig, ax):
-        ax.cla()
-        im = ax.imshow(occ_map, cmap=plt.cm.gray)
+    def redraw_map(self, sim):
+        self.ax.cla()
+        im = self.ax.imshow(self.occ_map, cmap=plt.cm.gray)
 
         for e in self.edges:
-            self.draw_edge(fig, ax, e)
+            self.draw_edge(e)
 
-        ax.plot(start[0], start[1], "go", markersize=30)
-        ax.plot(goal[0], goal[1], "ro", markersize=30)
-        ax.set_title(f"BIT* - Simulation {sim}")
-        ax.set_xlim(-10, 110)
-        ax.set_ylim(-10, 110)
+        self.ax.plot(self.start[1], self.start[0], "go", markersize=30)
+        self.ax.plot(self.goal[1], self.goal[0], "ro", markersize=30)
+        self.ax.set_title(f"BIT* - Simulation {sim}")
+        self.ax.set_xlim(-10, 110)
+        self.ax.set_ylim(-10, 110)
         
 
-        return fig, ax
-
-
 if __name__ == '__main__':
-    log_dir = '../Logs/Default.png/'
-    occ_map = np.array(Image.open('../gridmaps/Default.png'))
+    log_dir = '../Logs/Maze.png/'
+    occ_map = np.array(Image.open('../gridmaps/Maze.png'))
     start = np.array([0, 0])
     goal = np.array([99, 99])
 
@@ -212,5 +213,5 @@ if __name__ == '__main__':
     visualizer.read_json(log_dir, max_iter=np.inf)
 
     for i in range(len(os.listdir(log_dir))):
-        visualizer.draw(start, goal, i, True)
+        visualizer.draw(i, True)
     

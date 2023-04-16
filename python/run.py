@@ -73,7 +73,7 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
         visualizer.read_json(log_dir, max_iter=np.inf)
 
         for i in range(len(os.listdir(log_dir))):
-            visualizer.draw(start, goal, i, fast)
+            visualizer.draw(i, fast)
         plt.show()
 
 
