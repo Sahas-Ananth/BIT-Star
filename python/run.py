@@ -12,8 +12,10 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
     path_lengths = []
 
     text_path = f"{pwd}/../Output/path_lengths_and_times_{map_name}.txt"
+    with open(text_path, 'a') as f:
+        f.write("Seed,Path Length,Time Taken\n")
 
-    for seed in range(11):
+    for seed in range(seed):
 
         random.seed(seed)
         np.random.seed(seed)
@@ -26,12 +28,12 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
         start = np.array(start)
         goal = np.array(goal)
 
-    log_dir = f"{pwd}/../Logs/{map_name}"
+        log_dir = f"{pwd}/../Logs/{map_name}"
 
-    os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(log_dir, exist_ok=True)
 
-    map_path = f"{pwd}/../gridmaps/{map_name}.png"
-    occ_map = np.array(Image.open(map_path))
+        map_path = f"{pwd}/../gridmaps/{map_name}.png"
+        occ_map = np.array(Image.open(map_path))
 
         bit_star_vis.start_arr = start
         bit_star_vis.goal_arr = goal
@@ -79,36 +81,36 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
         time_taken_str = ','.join(str(t) for t in time_taken)
         print("time_taken_str:", time_taken_str)
 
-    if vis or fast:
-        output_dir = f"{pwd}/../Output/{map_name} - {str(datetime.now())}/"
-        os.makedirs(output_dir, exist_ok=True)
+        if vis or fast:
+            output_dir = f"{pwd}/../Output/{map_name} - {str(datetime.now())}/"
+            os.makedirs(output_dir, exist_ok=True)
 
-        inv_map = np.where((occ_map == 0) | (occ_map == 1), occ_map ^ 1, occ_map)
+            inv_map = np.where((occ_map == 0) | (occ_map == 1), occ_map ^ 1, occ_map)
 
-        visualizer = Visualizer(start, goal, inv_map, output_dir)
+            visualizer = Visualizer(start, goal, inv_map, output_dir)
 
             print(log_dir, os.listdir(log_dir))
             visualizer.read_json(log_dir, max_iter=np.inf)
 
             for i in range(len(os.listdir(log_dir))):
                 visualizer.draw(i, fast)
-        visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
-        print("Done drawing")
-            plt.show()
+                visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
+                print("Done drawing")
+                plt.show()
 
-        
-        with open(text_path, 'w') as f:
-            f.write("Seed,Path Length,Time Taken\n")
-            # f.write("Seed,Path Length,Time Taken\n")
-            # f.write(f"{seed},{path_lengths[seed]},{time_taken_str}\n")
-            f.write(f"{seed} , \t{path_lengths[seed]} ,\t{time_taken_str}\n")
             
-    # Delete the log directory
-    print("Deleting log directory: ", log_dir)
-    shutil.rmtree(log_dir)
-
-            # for seed in range(11):
+        with open(text_path, 'a') as f:
+                # f.write("Seed,Path Length,Time Taken\n")
+                # f.write(f"{seed},{path_lengths[seed]},{time_taken_str}\n")
+            f.write(f"{seed} , \t{path_lengths[seed]} ,\t{time_taken_str}\n")
                 
+        # Delete the log directory
+        print("Deleting log directory: ", log_dir)
+        shutil.rmtree(log_dir)
+        seed+=1
+
+                # for seed in range(11):
+                    
 
 def parse_opt():
     parser = argparse.ArgumentParser()
