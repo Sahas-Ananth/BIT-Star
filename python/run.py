@@ -3,6 +3,7 @@ from bit_star_vis import *
 import bit_star_vis
 from vis3 import *
 import sys
+import shutil
 
 
 def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
@@ -20,11 +21,10 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
     goal = np.array(goal)
 
     log_dir = f"{pwd}/../Logs/{map_name}"
-    
-    os.makedirs(log_dir, exist_ok=True)
-   
 
-    map_path = f"{pwd}/../gridmaps/{map_name}"
+    os.makedirs(log_dir, exist_ok=True)
+
+    map_path = f"{pwd}/../gridmaps/{map_name}.png"
     occ_map = np.array(Image.open(map_path))
 
     bit_star_vis.start_arr = start
@@ -35,7 +35,7 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
 
     map_obj = Map(start=start_node, goal=goal_node, occ_grid=occ_map)
     planner = None
-    if vis:
+    if vis or fast:
         planner = bitstar(
             start=start_node,
             goal=goal_node,
@@ -61,20 +61,26 @@ def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
     print(planner.ci, planner.old_ci)
     print(path, path_length)
 
-    if vis:
-        output_dir = f"{pwd}/../Output/PyViz/{map_name} - {str(datetime.now())}/"
+    if vis or fast:
+        output_dir = f"{pwd}/../Output/{map_name} - {str(datetime.now())}/"
         os.makedirs(output_dir, exist_ok=True)
 
-        inv_map = np.where((occ_map==0)|(occ_map==1), occ_map^1, occ_map)
+        inv_map = np.where((occ_map == 0) | (occ_map == 1), occ_map ^ 1, occ_map)
 
-        visualizer = Visualizer(start, goal, inv_map)
+        visualizer = Visualizer(start, goal, inv_map, output_dir)
 
         print(log_dir, os.listdir(log_dir))
         visualizer.read_json(log_dir, max_iter=np.inf)
 
         for i in range(len(os.listdir(log_dir))):
             visualizer.draw(i, fast)
+        visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
+        print("Done drawing")
         plt.show()
+
+    # Delete the log directory
+    print("Deleting log directory: ", log_dir)
+    shutil.rmtree(log_dir)
 
 
 def parse_opt():
@@ -82,8 +88,8 @@ def parse_opt():
     parser.add_argument(
         "--map_name",
         type=str,
-        default="Default.png",
-        help="Name of the map file. If none, will default to a 100x100 empty grid. Eg: --map_name Default.png",
+        default="Default",
+        help="Name of the map file without file extension as this only takes '.png'. If none, will default to a 100x100 empty grid. Eg: --map_name Default",
     )
     parser.add_argument(
         "--vis",
@@ -117,9 +123,9 @@ def parse_opt():
         help="When to stop the algorithm. Eg: --stop_time 60",
     )
     parser.add_argument(
-        '--fast',
-        action='store_true',
-        help="Whether or not to only plot the final edge list of each iteration."
+        "--fast",
+        action="store_true",
+        help="Whether or not to only plot the final edge list of each iteration. Note: when this flag is set the vis is also considered set. Eg: --fast",
     )
 
     opt = parser.parse_args()
