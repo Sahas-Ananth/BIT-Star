@@ -373,24 +373,28 @@ class bitstar:
     def make_plan(self):
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
             print("Start or Goal not in free space")
-            return None, None
+            return None, None, None
 
         if self.start.tup == self.goal.tup:
             print("Start and Goal are the same")
             self.vsol.add(self.start)
             self.ci = 0
-            return [self.start.tup], 0
+            return [self.start.tup], 0, None
 
         it = 0
         goal_num = 0
         plan_time = time.time()
         start = time.time()
 
+        time_taken = []
+
         try:
             while True:
                 if time.time() - plan_time >= self.stop_time:
                     print("Stopping due to time limit")
-                    return self.final_solution()
+                    # return self.final_solution()
+                    path , path_length = self.final_solution()
+                    return path, path_length, time_taken
 
                 it += 1
                 if self.qe.empty() and self.qv.empty():
@@ -468,10 +472,15 @@ class bitstar:
                                     if self.ci != self.old_ci:
                                         if time.time() - plan_time >= self.stop_time:
                                             print("Stopping due to time limit")
-                                            return self.final_solution()
+                                            # return self.final_solution()
+                                            path , path_length = self.final_solution()
+                                            return path, path_length, time_taken
 
                                         print("\n\nGOAL FOUND ", goal_num)
                                         print("Time Taken:", time.time() - start)
+                                        time_taken.append(time.time() - start)
+
+
                                         start = time.time()
                                         solution, length = self.final_solution()
                                         print("Path:", solution)
@@ -496,7 +505,9 @@ class bitstar:
         except KeyboardInterrupt:
             print(time.time() - start)
             print(self.final_solution())
-            return self.final_solution()
+            # return self.final_solution()
+            path , path_length = self.final_solution()
+            return path, path_length, time_taken
 
 
 # if __name__ == "__main__":
