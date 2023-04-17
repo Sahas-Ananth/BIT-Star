@@ -8,80 +8,109 @@ import shutil
 
 def main(map_name, vis, start, goal, rbit, samples, dim, seed, stop_time, fast):
     pwd = os.path.abspath(os.path.dirname(__file__))
+    time_taken_all = []
+    path_lengths = []
 
-    random.seed(seed)
-    np.random.seed(seed)
+    text_path = f"{pwd}/../Output/path_lengths_and_times_{map_name}.txt"
+    with open(text_path, 'a') as f:
+        f.write("Seed,Path Length,Time Taken\n")
 
-    start = []
-    goal = []
-    for i in range(opt.dim):
-        start.append(float(opt.start[i]))
-        goal.append(float(opt.goal[i]))
-    start = np.array(start)
-    goal = np.array(goal)
+    for seed in range(seed):
 
-    log_dir = f"{pwd}/../Logs/{map_name}"
+        random.seed(seed)
+        np.random.seed(seed)
 
-    os.makedirs(log_dir, exist_ok=True)
+        start = []
+        goal = []
+        for i in range(opt.dim):
+            start.append(float(opt.start[i]))
+            goal.append(float(opt.goal[i]))
+        start = np.array(start)
+        goal = np.array(goal)
 
-    map_path = f"{pwd}/../gridmaps/{map_name}.png"
-    occ_map = np.array(Image.open(map_path))
+        log_dir = f"{pwd}/../Logs/{map_name}"
 
-    bit_star_vis.start_arr = start
-    bit_star_vis.goal_arr = goal
+        os.makedirs(log_dir, exist_ok=True)
 
-    start_node = Node(tuple(start), gt=0)
-    goal_node = Node(tuple(goal))
+        map_path = f"{pwd}/../gridmaps/{map_name}.png"
+        occ_map = np.array(Image.open(map_path))
 
-    map_obj = Map(start=start_node, goal=goal_node, occ_grid=occ_map)
-    planner = None
-    if vis or fast:
-        planner = bitstar(
-            start=start_node,
-            goal=goal_node,
-            occ_map=map_obj,
-            no_samples=samples,
-            rbit=rbit,
-            dim=dim,
-            log_dir=log_dir,
-            stop_time=stop_time,
-        )
-    else:
-        planner = bitstar(
-            start=start_node,
-            goal=goal_node,
-            occ_map=map_obj,
-            no_samples=samples,
-            rbit=rbit,
-            dim=dim,
-            stop_time=stop_time,
-        )
-    path, path_length = planner.make_plan()
+        bit_star_vis.start_arr = start
+        bit_star_vis.goal_arr = goal
 
-    print(planner.ci, planner.old_ci)
-    print(path, path_length)
+        start_node = Node(tuple(start), gt=0)
+        goal_node = Node(tuple(goal))
 
-    if vis or fast:
-        output_dir = f"{pwd}/../Output/{map_name} - {str(datetime.now())}/"
-        os.makedirs(output_dir, exist_ok=True)
+        map_obj = Map(start=start_node, goal=goal_node, occ_grid=occ_map)
+        planner = None
+        if vis or fast:
+            planner = bitstar(
+                start=start_node,
+                goal=goal_node,
+                occ_map=map_obj,
+                no_samples=samples,
+                rbit=rbit,
+                dim=dim,
+                log_dir=log_dir,
+                stop_time=stop_time,
+            )
+        else:
+            planner = bitstar(
+                start=start_node,
+                goal=goal_node,
+                occ_map=map_obj,
+                no_samples=samples,
+                rbit=rbit,
+                dim=dim,
+                stop_time=stop_time,
+            )
+        path, path_length, time_taken = planner.make_plan()
 
-        inv_map = np.where((occ_map == 0) | (occ_map == 1), occ_map ^ 1, occ_map)
+        print(planner.ci, planner.old_ci)
+        print("path", path)
+        print("path length", path_length)
+        print("time taken", time_taken)
+        # print(path, path_length, time_taken)
 
-        visualizer = Visualizer(start, goal, inv_map, output_dir)
+        path_lengths.append(path_length)
+        time_taken_all.append(time_taken)
 
-        print(log_dir, os.listdir(log_dir))
-        visualizer.read_json(log_dir, max_iter=np.inf)
+        print(f"Seed {seed}:")
+        print(f"\tPath length: {path_length}")
+        print(f"\tTime taken:", time_taken)
+        time_taken_str = ','.join(str(t) for t in time_taken)
+        print("time_taken_str:", time_taken_str)
 
-        for i in range(len(os.listdir(log_dir))):
-            visualizer.draw(i, fast)
-        visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
-        print("Done drawing")
-        plt.show()
+        if vis or fast:
+            output_dir = f"{pwd}/../Output/{map_name} - {str(datetime.now())}/"
+            os.makedirs(output_dir, exist_ok=True)
 
-    # Delete the log directory
-    print("Deleting log directory: ", log_dir)
-    shutil.rmtree(log_dir)
+            inv_map = np.where((occ_map == 0) | (occ_map == 1), occ_map ^ 1, occ_map)
 
+            visualizer = Visualizer(start, goal, inv_map, output_dir)
+
+            print(log_dir, os.listdir(log_dir))
+            visualizer.read_json(log_dir, max_iter=np.inf)
+
+            for i in range(len(os.listdir(log_dir))):
+                visualizer.draw(i, fast)
+                visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
+                print("Done drawing")
+                plt.show()
+
+            
+        with open(text_path, 'a') as f:
+                # f.write("Seed,Path Length,Time Taken\n")
+                # f.write(f"{seed},{path_lengths[seed]},{time_taken_str}\n")
+            f.write(f"{seed} , \t{path_lengths[seed]} ,\t{time_taken_str}\n")
+                
+        # Delete the log directory
+        print("Deleting log directory: ", log_dir)
+        shutil.rmtree(log_dir)
+        seed+=1
+
+                # for seed in range(11):
+                    
 
 def parse_opt():
     parser = argparse.ArgumentParser()
