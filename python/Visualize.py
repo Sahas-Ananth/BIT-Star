@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 from typing import List, Tuple
+import tqdm
 
 
 class Visualizer:
@@ -70,10 +71,9 @@ class Visualizer:
         """
         # Sort the files in the folder.
         files = sorted(os.listdir(folder))
-        print(f"Found {len(files)} files")
         # If max_iter is not given then read all the files.
         max_iter = min(max_iter, len(files))
-        for i in range(max_iter):
+        for i in tqdm.tqdm(range(max_iter), desc="Reading JSON files", total=max_iter):
             # Open one file at a time and read the data.
             with open(os.path.join(folder, files[i]), "r") as f:
                 # Load the data from the json file.
@@ -88,8 +88,6 @@ class Visualizer:
                 self.all_cis.append(np.array(data["ci"]))
                 # Get all the final edges and append it to the list.
                 self.all_final_edge_list.append(data["final_edge_list"])
-                # Progress bar.
-                print(f"Loaded {i+1}/{max_iter}", end="\r")
 
     def draw_final_path(self, path: List[Tuple[float, float]]) -> None:
         """Draw the final path from start to goal.
@@ -180,17 +178,15 @@ class Visualizer:
         Args:
             sim (int): Simulation number.
         """
-        # Get the figure and axes.
-        fig = self.fig
-        ax = self.ax
         # Get the start and goal.
         start = self.start
         goal = self.goal
         # Calls redraw_map to redraw the map.
         self.redraw_map(sim)
 
-        print(f"Drawing Simulation {sim}")
-        print(len(self.all_new_edges[sim]))
+        # Get the figure and axes.
+        fig = self.fig
+        ax = self.ax
 
         # Loop through all the edges and draw them.
         for i in range(len(self.all_new_edges[sim])):
@@ -301,7 +297,7 @@ class Visualizer:
             loc="upper left",
         )
         # Save the plot at the given output directory and show the plot.
-        plt.savefig(f"{self.output_dir}/Bitstar_Simulation_{sim}.png")
+        plt.savefig(f"{self.output_dir}/Bitstar_Simulation_{sim:02d}.png")
         # Show the plot and pause for a short time without blocking.
         plt.show(block=False)
         plt.pause(1)
@@ -322,7 +318,8 @@ class Visualizer:
 
     def redraw_map(self, sim: int) -> None:
         # Clear the current plot.
-        self.ax.cla()
+        plt.close()
+        self.fig, self.ax = plt.subplots(figsize=(20, 20))
         # Get the occupancy map for this simulation.
         im = self.ax.imshow(self.occ_map, cmap=plt.cm.gray, extent=[0, 100, 100, 0])
 

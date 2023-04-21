@@ -3,7 +3,6 @@ from BIT_Star import *
 import BIT_Star as BIT_Star
 import Node as node
 from Node import *
-import Map as map_handler
 from Map import *
 from Visualize import *
 import sys
@@ -50,9 +49,6 @@ def main(
     text_path = f"{pwd}/../Output/path_lengths_and_times_{map_name}.txt"
     # Make the directory if it does not exist.
     os.makedirs(os.path.dirname(text_path), exist_ok=True)
-    # Open the file and write the header.
-    with open(text_path, "a") as f:
-        f.write("Seed,Path Length,Time Taken\n")
 
     # Run the algorithm for each seed.
     for seed in range(seed):
@@ -119,17 +115,18 @@ def main(
         # Make the plan.
         path, path_length, time_taken = planner.make_plan()
 
-        print(planner.ci, planner.old_ci)
-        print(path, path_length)
+        print(
+            f"{CGREEN2}Seed: {seed}\t\tFinal CI: {planner.ci}\tOld CI: {planner.old_ci}\tFinal Path Length: {path_length}\nPath:{CEND} {path}\n{CGREEN2}Time Taken per iteration:{CEND} {time_taken}\n{CEND}"
+        )
         # Append the time taken and path length to the lists.
         time_taken_all.append(time_taken)
         path_lengths.append(path_length)
-        print(f"Seed: {seed}, Path Length: {path_length}, Time Taken: {time_taken}")
-
         # Convert the lists to strings and write them to the text file.
-        time_taken_str = ",".join([str(t) for t in time_taken])
+        time_taken_str = ", ".join([str(t) for t in time_taken])
         with open(text_path, "a") as f:
-            f.write(f"{seed},{path_length},{time_taken_str}\n")
+            f.write(
+                f"Seed: {seed}\nPath Length: {path_length}\nTime Taken: {time_taken_str}\n"
+            )
 
         if vis or fast:
             # Create the output directory. The directory name is the map name and the current date and time.
@@ -142,7 +139,9 @@ def main(
             # Create the visualizer object and pass the start and goal coordinates, the occupancy grid map, and the output directory.
             visualizer = Visualizer(start, goal, inv_map, output_dir)
 
-            print(log_dir, os.listdir(log_dir))
+            print(
+                f"{CGREEN2}{CBOLD}{len(os.listdir(log_dir))} files in Log Directory:{CEND} {log_dir}/{sorted(os.listdir(log_dir))}\n"
+            )
             # Read the log files.
             visualizer.read_json(log_dir, max_iter=np.inf)
 
@@ -151,12 +150,13 @@ def main(
                 visualizer.draw(i, fast)
             # After all the simulations are drawn, set the title of the plot and show it is done drawing.
             visualizer.ax.set_title("BIT* - Final Path", fontsize=30)
-            print("Done drawing")
             # Wait for the user to close the plot.
             plt.show()
 
         # Delete the log directory. This is done so the results of this experiment does not affect the results of the next experiment.
-        print("Deleting log directory: ", log_dir)
+        print(
+            f"{CRED2}================== Deleting log directory: {log_dir} =================={CEND}"
+        )
         # Remove the log directory.
         shutil.rmtree(log_dir)
 
@@ -227,7 +227,7 @@ if __name__ == "__main__":
 
     # Parse the arguments.
     opt = parse_opt()
-    print(opt)
+    print(f"{CYELLOW2}{opt}{CEND}")
 
     # Make sure the start and goal coordinates are of the correct dimension.
     assert len(opt.start) == opt.dim

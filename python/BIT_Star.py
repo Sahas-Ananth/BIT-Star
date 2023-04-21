@@ -8,6 +8,7 @@ import time
 import json
 from Node import Node
 from Map import Map
+from PrintColours import *
 
 
 class bitstar:
@@ -300,7 +301,7 @@ class bitstar:
                 if (int(op[0]), int(op[1])) in self.intersection:
                     break
             except:
-                print(op, x_ball, r, self.cmin, self.ci, cwe)
+                print(CBOLD, CRED2, op, x_ball, r, self.cmin, self.ci, cwe, CEND)
                 exit()
 
         return op
@@ -444,7 +445,7 @@ class bitstar:
         Args:
             goal_num (int): The Simulation run number. This is used to name the JSON file. The JSON file is saved in the log directory.
         """
-        print("Dumping data...")
+        print(f"{CGREENBG}Data saved.{CEND}")
         # Add the final edge list to the JSON file.
         self.json_contents["final_edge_list"] = list(self.E_vis)
 
@@ -476,12 +477,12 @@ class bitstar:
         """
         # If the start or goal is not in the free space, return None.
         if self.start.tup not in self.map.free or self.goal.tup not in self.map.free:
-            print("Start or Goal not in free space")
+            print(f"{CYELLOW2}Start or Goal not in free space.{CEND}")
             return None, None, None
 
         # If the start and goal are the same, return the start node, path length 0 and None for the time taken.
         if self.start.tup == self.goal.tup:
-            print("Start and Goal are the same")
+            print(f"{CGREEN2}Start and Goal are the same.{CEND}")
             self.vsol.add(self.start)
             self.ci = 0
             return [self.start.tup], 0, None
@@ -502,7 +503,9 @@ class bitstar:
             while True:
                 # If the time limit is reached, return the final solution path.
                 if time.time() - plan_time >= self.stop_time:
-                    print("Stopping due to time limit")
+                    print(
+                        f"\n\n{CITALIC}{CYELLOW2}============================================= Stopping due to time limit ============================================{CEND}"
+                    )
                     path, path_length = self.final_solution()
                     return path, path_length, time_taken
 
@@ -615,13 +618,20 @@ class bitstar:
                                     if self.ci != self.old_ci:
                                         # If the time limit is reached, return the current solution.
                                         if time.time() - plan_time >= self.stop_time:
-                                            print("Stopping due to time limit")
+                                            print(
+                                                f"\n\n{CITALIC}{CYELLOW2}============================================= Stopping due to time limit ============================================{CEND}"
+                                            )
                                             path, path_length = self.final_solution()
                                             return path, path_length, time_taken
                                         # Print the solution.
-                                        print("\n\nGOAL FOUND ", goal_num)
+                                        print(
+                                            f"\n\n{CBOLD}{CGREEN2}================================================ GOAL FOUND {goal_num:02d} times ================================================{CEND}"
+                                        )
                                         # The time taken to find the solution.
-                                        print("Time Taken:", time.time() - start)
+                                        print(
+                                            f"{CBLUE2}Time Taken:{CEND} {time.time() - start}",
+                                            end="\t\t",
+                                        )
                                         # Append the time taken to the list of time taken.
                                         time_taken.append(time.time() - start)
 
@@ -629,13 +639,16 @@ class bitstar:
                                         start = time.time()
                                         # Get the solution path and the length of the path.
                                         solution, length = self.final_solution()
-                                        # Print the solution path and the length of the path.
-                                        print("Path:", solution)
-                                        print("Path Length:", length)
+                                        # Print the solution length.
+                                        print(
+                                            f"{CBLUE2}Path Length:{CEND} {length}{CEND}"
+                                        )
                                         # Print the old_ci, new_ci, ci - cmin, and the difference in the ci values.
                                         print(
-                                            f"Old CI: {self.old_ci}, New CI: {self.ci}, ci - cmin: {round(self.ci - self.cmin, 5)}, Difference in CI: {round(self.old_ci - self.ci, 5)}"
+                                            f"{CBLUE2}Old CI:{CEND} {self.old_ci}\t{CBLUE2}New CI:{CEND} {self.ci}\t{CBLUE2}ci - cmin:{CEND} {round(self.ci - self.cmin, 5)}\t {CBLUE2}Difference in CI:{CEND} {round(self.old_ci - self.ci, 5)}"
                                         )
+                                        # Print the solution path.
+                                        print(f"{CBLUE2}Path:{CEND} {solution}")
                                         # Set the old_ci to the new_ci.
                                         self.old_ci = self.ci
                                         # If the save flag is set, Dump the data.
