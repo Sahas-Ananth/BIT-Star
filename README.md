@@ -28,6 +28,7 @@ mance in R2 space for different motion planning scenarios.
 ```
 git clone https://github.com/Sahas-Ananth/BIT-Star.git
 cd BIT-star
+pip install -r requirements.txt
 ```
 
 ## Usage
