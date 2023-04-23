@@ -50,7 +50,14 @@ We also provide options to change the rbit (maximum edge length), and number of 
 
 ## Examples
 
+- Empty Scenario
 <img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/default_gif.gif"  alt="Empty Scenario">
-<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/enc_gif.gif"  alt="Empty Scenario">
-<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/maze_gif.gif"  alt="Empty Scenario">
-<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/wall_gif.gif"  alt="Empty Scenario">
+
+- Enclosure Scenario
+<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/enc_gif.gif"  alt="Enclosure Scenario">
+
+- Maze Scenario
+<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/maze_gif.gif"  alt="Maze Scenario">
+
+- Wall Scenario
+<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/wall_gif.gif"  alt="Wall Scenario">
