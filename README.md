@@ -50,4 +50,4 @@ We also provide options to change the rbit (maximum edge length), and number of 
 
 ## Examples
 
-<img src="https://github.com/Sahas-Ananth/BIT-Star/Output/default_gif.gif" width="250" height="250" alt="Empty Scenario">
+<img src="https://github.com/Sahas-Ananth/BIT-Star/blob/main/Output/default_gif.gif" width="250" height="250" alt="Empty Scenario">
