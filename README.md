@@ -3,7 +3,15 @@
 ## BIT* Algorithm - Introduction
 
 
- Path Planning in Robotics has always relied on simple approximations to identify solutions. This is due to the difficulty to find one due to the high dimensional nature of the problem. Generally, we can divide the approximations into 2 types: Search-based and Sampling-based. Heuristics are used by search-based planners like A* to effectively search across graphs, but their efficiency is limited by the resolution of the selected approximation. To approximate the problem, sample-based planners such as RRT* employ random sampling. Here, the resolution can be increased until we find a suitable solution. These random samples approximate the region in all directions at the same time, making the search ineffective. A recent approach called Batch Informed Trees (BIT*)combines the strengths of both Search-based sampling-based planners. Heuristics and Sampling is used by BIT* to alternate between searching and approximating. In this work, we have used the pseudo-code from the paper and coded the algorithm from scratch, and tested its performance in R2 space for different motion planning scenarios.
+
+ Path Planning in Robotics has always relied on simple approximations to identify solutions. This is due to the difficulty to find one due to the high dimensional nature of the problem. 
+ 
+ Generally, we can divide the approximations into 2 types: 
+ Search-based and Sampling-based. 
+ 
+ Heuristics are used by search-based planners like A* to effectively search across graphs, but their efficiency is limited by the resolution of the selected approximation. To approximate the problem, sample-based planners such as RRT* employ random sampling. Here, the resolution can be increased until we find a suitable solution. These random samples approximate the region in all directions at the same time, making the search ineffective. 
+ 
+ A recent approach called Batch Informed Trees (BIT*)combines the strengths of both Search-based sampling-based planners. Heuristics and Sampling is used by BIT* to alternate between searching and approximating. In this work, we have used the pseudo-code from the paper and coded the algorithm from scratch, and tested its performance in R2 space for different motion planning scenarios.
 
 ## Installation
 
@@ -15,7 +23,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-<details>
+<!-- <details> -->
 <summary> Python </summary>
 
 To use our python implementation of BIT-star, we provide a run.py file with options to specify all the arguments passed to the algorithm. A full list of options can be seen by running 
@@ -37,4 +45,9 @@ python3 run.py --map_name Maze --start 0 0 --goal 99 99 --seed 1 --stop_time 60 
 ```
 
 We also provide options to change the rbit (maximum edge length), and number of samples when running. You can also visualize every edge addition and removal by disabling the --fast option.
-</details>
+<!-- </details> -->
+
+
+## Examples
+
+<img src="https://github.com/Sahas-Ananth/BIT-Star/Output/default_gif.gif" width="250" height="250" alt="Empty Scenario">
